@@ -7,6 +7,8 @@ import (
 )
 
 type AI interface {
+	Limiter
+
 	SetModel(string)
 	Model
 
