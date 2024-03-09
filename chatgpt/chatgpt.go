@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/sashabaranov/go-openai"
+	"golang.org/x/time/rate"
 )
 
 const defaultModel = openai.GPT3Dot5Turbo
@@ -19,6 +20,8 @@ type ChatGPT struct {
 	temperature *float32
 	topP        *float32
 	count       *int32
+
+	limiter *rate.Limiter
 }
 
 func New(authToken string) ai.AI {
@@ -27,6 +30,17 @@ func New(authToken string) ai.AI {
 
 func NewWithClient(client *openai.Client) ai.AI {
 	return &ChatGPT{Client: client, model: defaultModel}
+}
+
+func (chatgpt *ChatGPT) SetLimit(limit rate.Limit) {
+	chatgpt.limiter = ai.NewLimiter(limit)
+}
+
+func (ai *ChatGPT) wait(ctx context.Context) error {
+	if ai.limiter != nil {
+		return ai.limiter.Wait(ctx)
+	}
+	return nil
 }
 
 func (ai *ChatGPT) SetModel(model string)    { ai.model = model }
@@ -87,7 +101,10 @@ func (ai *ChatGPT) chat(
 	ctx context.Context,
 	history []openai.ChatCompletionMessage,
 	messages ...string,
-) (openai.ChatCompletionResponse, error) {
+) (resp openai.ChatCompletionResponse, err error) {
+	if err = ai.wait(ctx); err != nil {
+		return
+	}
 	return ai.CreateChatCompletion(ctx, ai.createRequest(history, messages...))
 }
 
@@ -131,6 +148,9 @@ func (ai *ChatGPT) chatStream(
 	history []openai.ChatCompletionMessage,
 	messages ...string,
 ) (*openai.ChatCompletionStream, error) {
+	if err := ai.wait(ctx); err != nil {
+		return nil, err
+	}
 	req := ai.createRequest(history, messages...)
 	req.Stream = true
 	return ai.CreateChatCompletionStream(ctx, req)

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/google/generative-ai-go/genai"
+	"golang.org/x/time/rate"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )
@@ -19,6 +20,8 @@ type Gemini struct {
 	*genai.Client
 	model  *genai.GenerativeModel
 	config genai.GenerationConfig
+
+	limiter *rate.Limiter
 }
 
 func New(apiKey string) (ai.AI, error) {
@@ -31,6 +34,17 @@ func New(apiKey string) (ai.AI, error) {
 
 func NewWithClient(client *genai.Client) ai.AI {
 	return &Gemini{Client: client, model: client.GenerativeModel(defaultModel)}
+}
+
+func (gemini *Gemini) SetLimit(limit rate.Limit) {
+	gemini.limiter = ai.NewLimiter(limit)
+}
+
+func (ai *Gemini) wait(ctx context.Context) error {
+	if ai.limiter != nil {
+		return ai.limiter.Wait(ctx)
+	}
+	return nil
 }
 
 func (ai *Gemini) SetModel(model string) {
@@ -72,6 +86,9 @@ func texts2parts(texts []string) (parts []genai.Part) {
 }
 
 func (ai *Gemini) Chat(ctx context.Context, parts ...string) (ai.ChatResponse, error) {
+	if err := ai.wait(ctx); err != nil {
+		return nil, err
+	}
 	resp, err := ai.model.GenerateContent(ctx, texts2parts(parts)...)
 	if err != nil {
 		return nil, err
@@ -97,16 +114,23 @@ func (stream *ChatStream) Next() (ai.ChatResponse, error) {
 }
 
 func (ai *Gemini) ChatStream(ctx context.Context, parts ...string) (ai.ChatStream, error) {
+	if err := ai.wait(ctx); err != nil {
+		return nil, err
+	}
 	return &ChatStream{ai.model.GenerateContentStream(ctx, texts2parts(parts)...)}, nil
 }
 
 var _ ai.Chatbot = new(ChatSession)
 
 type ChatSession struct {
+	ai *Gemini
 	*genai.ChatSession
 }
 
 func (session *ChatSession) Chat(ctx context.Context, parts ...string) (ai.ChatResponse, error) {
+	if err := session.ai.wait(ctx); err != nil {
+		return nil, err
+	}
 	resp, err := session.SendMessage(ctx, texts2parts(parts)...)
 	if err != nil {
 		return nil, err
@@ -115,9 +139,12 @@ func (session *ChatSession) Chat(ctx context.Context, parts ...string) (ai.ChatR
 }
 
 func (session *ChatSession) ChatStream(ctx context.Context, parts ...string) (ai.ChatStream, error) {
+	if err := session.ai.wait(ctx); err != nil {
+		return nil, err
+	}
 	return &ChatStream{session.SendMessageStream(ctx, texts2parts(parts)...)}, nil
 }
 
 func (ai *Gemini) ChatSession() ai.Chatbot {
-	return &ChatSession{ai.model.StartChat()}
+	return &ChatSession{ai, ai.model.StartChat()}
 }
