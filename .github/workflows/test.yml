@@ -23,6 +23,8 @@ jobs:
           go-version: stable
 
       - name: Test Code
+        env: 
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           go build -v ./...
           go test -v -race ./...
