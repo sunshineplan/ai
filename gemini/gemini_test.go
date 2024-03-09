@@ -24,17 +24,17 @@ func TestGemini(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	fmt.Println("Who am I?")
-	resp, err := gemini.Chat(ctx, "Who am I?")
+	fmt.Println("Who are you?")
+	resp, err := gemini.Chat(ctx, "Who are you?")
 	if err != nil {
 		t.Fatal(err)
 	}
 	fmt.Println(resp.Results())
 	fmt.Println("---")
-	fmt.Println("Who are you?")
+	fmt.Println("Who am I?")
 	ctx, cancel = context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	stream, err := gemini.ChatStream(ctx, "Who are you?")
+	stream, err := gemini.ChatStream(ctx, "Who am I?")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,9 +61,18 @@ func TestGemini(t *testing.T) {
 	ctx, cancel = context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	fmt.Println("How many paws are in my house?")
-	resp, err = s.Chat(ctx, "How many paws are in my house?")
+	stream, err = s.ChatStream(ctx, "How many paws are in my house?")
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Println(resp.Results())
+	for {
+		resp, err := stream.Next()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			t.Fatal(err)
+		}
+		fmt.Println(resp.Results())
+	}
 }
