@@ -1,10 +1,11 @@
 package gemini
 
 import (
-	"ai"
 	"context"
 	"io"
 	"strings"
+
+	"github.com/sunshineplan/ai"
 
 	"github.com/google/generative-ai-go/genai"
 	"golang.org/x/time/rate"

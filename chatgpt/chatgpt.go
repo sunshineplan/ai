@@ -1,9 +1,10 @@
 package chatgpt
 
 import (
-	"ai"
 	"context"
 	"io"
+
+	"github.com/sunshineplan/ai"
 
 	"github.com/sashabaranov/go-openai"
 	"golang.org/x/time/rate"

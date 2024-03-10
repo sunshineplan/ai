@@ -1,13 +1,14 @@
 package gemini
 
 import (
-	"ai"
 	"context"
 	"fmt"
 	"io"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/sunshineplan/ai"
 )
 
 func TestGemini(t *testing.T) {
