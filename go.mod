@@ -1,4 +1,4 @@
-module ai
+module github.com/sunshineplan/ai
 
 go 1.22
 
