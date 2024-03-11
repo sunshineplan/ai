@@ -135,7 +135,6 @@ func (stream *ChatStream) Next() (ai.ChatResponse, error) {
 			}
 		}
 		stream.content = ""
-		stream.Close()
 		return nil, err
 	}
 	if stream.cs != nil {
