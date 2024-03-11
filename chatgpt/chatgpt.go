@@ -144,6 +144,11 @@ func (stream *ChatStream) Next() (ai.ChatResponse, error) {
 	return &ChatResponse[openai.ChatCompletionStreamResponse]{resp}, nil
 }
 
+func (stream *ChatStream) Close() error {
+	stream.ChatCompletionStream.Close()
+	return nil
+}
+
 func (ai *ChatGPT) chatStream(
 	ctx context.Context,
 	history []openai.ChatCompletionMessage,
@@ -192,4 +197,8 @@ func (session *ChatSession) ChatStream(ctx context.Context, messages ...string) 
 func (ai *ChatGPT) ChatSession() ai.Chatbot {
 	ai.count = nil
 	return &ChatSession{ai: ai}
+}
+
+func (ai *ChatGPT) Close() error {
+	return nil
 }

@@ -114,6 +114,10 @@ func (stream *ChatStream) Next() (ai.ChatResponse, error) {
 	return &ChatResponse{resp}, nil
 }
 
+func (stream *ChatStream) Close() error {
+	return nil
+}
+
 func (ai *Gemini) ChatStream(ctx context.Context, parts ...string) (ai.ChatStream, error) {
 	if err := ai.wait(ctx); err != nil {
 		return nil, err

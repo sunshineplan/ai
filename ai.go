@@ -14,6 +14,8 @@ type AI interface {
 
 	Chatbot
 	ChatSession() Chatbot
+
+	Close() error
 }
 
 type Model interface {
@@ -30,6 +32,7 @@ type Chatbot interface {
 
 type ChatStream interface {
 	Next() (ChatResponse, error)
+	Close() error
 }
 
 type ChatResponse interface {
