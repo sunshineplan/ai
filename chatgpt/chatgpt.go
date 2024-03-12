@@ -143,11 +143,6 @@ func (stream *ChatStream) Next() (ai.ChatResponse, error) {
 	return &ChatResponse[openai.ChatCompletionStreamResponse]{resp}, nil
 }
 
-func (stream *ChatStream) Close() error {
-	stream.ChatCompletionStream.Close()
-	return nil
-}
-
 func (ai *ChatGPT) chatStream(
 	ctx context.Context,
 	history []openai.ChatCompletionMessage,
