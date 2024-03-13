@@ -16,7 +16,7 @@ type AI interface {
 	Model
 
 	Chatbot
-	ChatSession() Chatbot
+	ChatSession() ChatSession
 
 	Close() error
 }
@@ -31,6 +31,16 @@ type Model interface {
 type Chatbot interface {
 	Chat(context.Context, ...string) (ChatResponse, error)
 	ChatStream(context.Context, ...string) (ChatStream, error)
+}
+
+type Message struct {
+	Content string
+	Role    string
+}
+
+type ChatSession interface {
+	Chatbot
+	History() []Message
 }
 
 type ChatStream interface {

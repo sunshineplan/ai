@@ -59,6 +59,22 @@ func (ai *Gemini) SetMaxTokens(i int32)     { ai.config.SetMaxOutputTokens(i) }
 func (ai *Gemini) SetTemperature(f float32) { ai.config.SetTemperature(f) }
 func (ai *Gemini) SetTopP(f float32)        { ai.config.SetTopP(f) }
 
+func texts2parts(texts []string) (parts []genai.Part) {
+	for _, i := range texts {
+		parts = append(parts, genai.Text(i))
+	}
+	return
+}
+
+func parts2texts(parts []genai.Part) (texts []string) {
+	for _, i := range parts {
+		if text, ok := i.(genai.Text); ok {
+			texts = append(texts, string(text))
+		}
+	}
+	return
+}
+
 var _ ai.ChatResponse = new(ChatResponse)
 
 type ChatResponse struct {
@@ -68,13 +84,7 @@ type ChatResponse struct {
 func (resp *ChatResponse) Results() (res []string) {
 	for _, i := range resp.Candidates {
 		if i.Content != nil {
-			var parts []string
-			for _, part := range i.Content.Parts {
-				if text, ok := part.(genai.Text); ok {
-					parts = append(parts, string(text))
-				}
-			}
-			res = append(res, strings.Join(parts, "\n"))
+			res = append(res, strings.Join(parts2texts(i.Content.Parts), "\n"))
 		}
 	}
 	return
@@ -85,13 +95,6 @@ func (resp *ChatResponse) String() string {
 		return res[0]
 	}
 	return ""
-}
-
-func texts2parts(texts []string) (parts []genai.Part) {
-	for _, i := range texts {
-		parts = append(parts, genai.Text(i))
-	}
-	return
 }
 
 func (ai *Gemini) Chat(ctx context.Context, parts ...string) (ai.ChatResponse, error) {
@@ -137,7 +140,7 @@ func (ai *Gemini) ChatStream(ctx context.Context, parts ...string) (ai.ChatStrea
 	return &ChatStream{ai.model.GenerateContentStream(ctx, texts2parts(parts)...)}, nil
 }
 
-var _ ai.Chatbot = new(ChatSession)
+var _ ai.ChatSession = new(ChatSession)
 
 type ChatSession struct {
 	ai *Gemini
@@ -162,7 +165,14 @@ func (session *ChatSession) ChatStream(ctx context.Context, parts ...string) (ai
 	return &ChatStream{session.cs.SendMessageStream(ctx, texts2parts(parts)...)}, nil
 }
 
-func (ai *Gemini) ChatSession() ai.Chatbot {
+func (session *ChatSession) History() (history []ai.Message) {
+	for _, i := range session.cs.History {
+		history = append(history, ai.Message{Content: strings.Join(parts2texts(i.Parts), "\n"), Role: i.Role})
+	}
+	return
+}
+
+func (ai *Gemini) ChatSession() ai.ChatSession {
 	return &ChatSession{ai, ai.model.StartChat()}
 }
 
