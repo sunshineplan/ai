@@ -85,7 +85,7 @@ func (resp *ChatResponse[Response]) String() string {
 }
 
 func (ai *ChatGPT) createRequest(
-	stream bool,
+	one bool,
 	history []openai.ChatCompletionMessage,
 	messages ...string,
 ) (req openai.ChatCompletionRequest) {
@@ -93,7 +93,7 @@ func (ai *ChatGPT) createRequest(
 	if ai.maxTokens != nil {
 		req.MaxTokens = int(*ai.maxTokens)
 	}
-	if !stream && ai.count != nil {
+	if !one && ai.count != nil {
 		req.N = int(*ai.count)
 	}
 	if ai.temperature != nil {
@@ -114,6 +114,7 @@ func (ai *ChatGPT) createRequest(
 
 func (chatgpt *ChatGPT) chat(
 	ctx context.Context,
+	session bool,
 	history []openai.ChatCompletionMessage,
 	messages ...string,
 ) (resp openai.ChatCompletionResponse, err error) {
@@ -124,11 +125,11 @@ func (chatgpt *ChatGPT) chat(
 	if err = chatgpt.wait(ctx); err != nil {
 		return
 	}
-	return chatgpt.c.CreateChatCompletion(ctx, chatgpt.createRequest(false, history, messages...))
+	return chatgpt.c.CreateChatCompletion(ctx, chatgpt.createRequest(session, history, messages...))
 }
 
 func (ai *ChatGPT) Chat(ctx context.Context, messages ...string) (ai.ChatResponse, error) {
-	resp, err := ai.chat(ctx, nil, messages...)
+	resp, err := ai.chat(ctx, false, nil, messages...)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +149,7 @@ func (stream *ChatStream) Next() (ai.ChatResponse, error) {
 	if err != nil {
 		if err == io.EOF {
 			if stream.cs != nil {
-				stream.cs.History = append(stream.cs.History, openai.ChatCompletionMessage{
+				stream.cs.history = append(stream.cs.history, openai.ChatCompletionMessage{
 					Role: openai.ChatMessageRoleAssistant, Content: stream.merged})
 			}
 		}
@@ -189,31 +190,49 @@ func (ai *ChatGPT) ChatStream(ctx context.Context, messages ...string) (ai.ChatS
 	return &ChatStream{stream, nil, ""}, nil
 }
 
-var _ ai.Chatbot = new(ChatSession)
+var _ ai.ChatSession = new(ChatSession)
 
 type ChatSession struct {
 	ai      *ChatGPT
-	History []openai.ChatCompletionMessage
+	history []openai.ChatCompletionMessage
+}
+
+func addToHistory(history *[]openai.ChatCompletionMessage, role string, messages ...string) {
+	for _, i := range messages {
+		*history = append(
+			*history,
+			openai.ChatCompletionMessage{Role: role, Content: i},
+		)
+	}
 }
 
 func (session *ChatSession) Chat(ctx context.Context, messages ...string) (ai.ChatResponse, error) {
-	resp, err := session.ai.chat(ctx, session.History, messages...)
+	resp, err := session.ai.chat(ctx, true, session.history, messages...)
 	if err != nil {
 		return nil, err
 	}
-	session.History = append(session.History, resp.Choices[0].Message)
+	addToHistory(&session.history, openai.ChatMessageRoleUser, messages...)
+	session.history = append(session.history, resp.Choices[0].Message)
 	return &ChatResponse[openai.ChatCompletionResponse]{resp}, nil
 }
 
 func (session *ChatSession) ChatStream(ctx context.Context, messages ...string) (ai.ChatStream, error) {
-	stream, err := session.ai.chatStream(ctx, session.History, messages...)
+	stream, err := session.ai.chatStream(ctx, session.history, messages...)
 	if err != nil {
 		return nil, err
 	}
+	addToHistory(&session.history, openai.ChatMessageRoleUser, messages...)
 	return &ChatStream{stream, session, ""}, nil
 }
 
-func (ai *ChatGPT) ChatSession() ai.Chatbot {
+func (session *ChatSession) History() (history []ai.Message) {
+	for _, i := range session.history {
+		history = append(history, ai.Message{Content: i.Content, Role: i.Role})
+	}
+	return
+}
+
+func (ai *ChatGPT) ChatSession() ai.ChatSession {
 	return &ChatSession{ai: ai}
 }
 

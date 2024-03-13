@@ -1,4 +1,4 @@
-package gemini
+package chatgpt
 
 import (
 	"context"
@@ -7,27 +7,19 @@ import (
 	"os"
 	"testing"
 	"time"
-
-	"github.com/sunshineplan/ai"
 )
 
-func TestGemini(t *testing.T) {
-	if proxy := os.Getenv("GEMINI_PROXY"); proxy != "" {
-		ai.SetProxy(proxy)
-	}
-	apiKey := os.Getenv("GEMINI_API_KEY")
+func TestChatGPT(t *testing.T) {
+	apiKey := os.Getenv("CHATGPT_API_KEY")
 	if apiKey == "" {
 		return
 	}
-	gemini, err := New(apiKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer gemini.Close()
+	chatgpt := New(apiKey)
+	defer chatgpt.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	fmt.Println("Who are you?")
-	resp, err := gemini.Chat(ctx, "Who are you?")
+	resp, err := chatgpt.Chat(ctx, "Who are you?")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +28,7 @@ func TestGemini(t *testing.T) {
 	fmt.Println("Who am I?")
 	ctx, cancel = context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	stream, err := gemini.ChatStream(ctx, "Who am I?")
+	stream, err := chatgpt.ChatStream(ctx, "Who am I?")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +44,7 @@ func TestGemini(t *testing.T) {
 		fmt.Println(resp.Results())
 	}
 	fmt.Println("---")
-	s := gemini.ChatSession()
+	s := chatgpt.ChatSession()
 	ctx, cancel = context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	fmt.Println("Hello, I have 2 dogs in my house.")
