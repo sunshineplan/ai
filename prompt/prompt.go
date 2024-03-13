@@ -16,24 +16,26 @@ const (
 	defaultWorkers = 3
 )
 
-const defaultTemplate = `{{.Request}}{{with .Example}}
+const defaultTemplate = `{{.Request}}{{if .Example}}
+###
 Example:
-{{.}}
+{{.Example.Sprint .Prefix}}
 ###{{end}}{{if .Input}}
-Input:{{if gt (len .Input) 1}}{{printBatch .Input .Prefix .Start}}{{else}} {{index .Input 0}}{{end}}{{end}}
+Input:"""
+{{printBatch .Input .Prefix .Start}}"""{{end}}
 Output:`
 
 func printBatch(s []string, prefix string, start int) string {
 	var b strings.Builder
-	fmt.Fprintln(&b, `"""`)
 	for i, s := range s {
 		if prefix == "" {
 			fmt.Fprintln(&b, s)
+		} else if strings.Count(prefix, "%d") == 0 {
+			fmt.Fprintln(&b, prefix+s)
 		} else {
-			fmt.Fprintf(&b, prefix+"%s\n", start+i+1, s)
+			fmt.Fprintln(&b, fmt.Sprintf(prefix, start+i+1)+s)
 		}
 	}
-	fmt.Fprint(&b, `"""`)
 	return b.String()
 }
 

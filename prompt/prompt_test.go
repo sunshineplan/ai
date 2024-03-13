@@ -16,22 +16,22 @@ func TestPrompt(t *testing.T) {
 			New("no example single input"),
 			[]string{"test"},
 			"",
-			[]string{"no example single input\nInput: test\nOutput:"},
+			[]string{"no example single input\nInput:\"\"\"\ntest\n\"\"\"\nOutput:"},
 		},
 		{
-			New("has example single input").SetExample(Example{[]string{"abc", "def"}, "example", ""}),
+			New("has example single input").SetExample(Example{[]string{"abc", "def"}, "example"}),
 			[]string{"test"},
 			"",
 			[]string{
-				"has example single input\nExample:\nInput:\"\"\"\nabc\ndef\n\"\"\"\nOutput: example\n###\nInput: test\nOutput:",
+				"has example single input\n###\nExample:\nInput:\"\"\"\nabc\ndef\n\"\"\"\nOutput: example\n###\nInput:\"\"\"\ntest\n\"\"\"\nOutput:",
 			},
 		},
 		{
-			New("has example with prefix single input").SetExample(Example{[]string{"abc", "def"}, "example", "%d|"}),
+			New("has example single input with prefix").SetExample(Example{[]string{"abc", "def"}, "example"}),
 			[]string{"test"},
-			"",
+			"%d|",
 			[]string{
-				"has example with prefix single input\nExample:\nInput:\"\"\"\n1|abc\n2|def\n\"\"\"\nOutput: example\n###\nInput: test\nOutput:",
+				"has example single input with prefix\n###\nExample:\nInput:\"\"\"\n1|abc\n2|def\n\"\"\"\nOutput: example\n###\nInput:\"\"\"\n1|test\n\"\"\"\nOutput:",
 			},
 		},
 		{
@@ -47,12 +47,18 @@ func TestPrompt(t *testing.T) {
 			[]string{"no example multiple inputs with prefix\nInput:\"\"\"\n1|test1\n2|test2\n\"\"\"\nOutput:"},
 		},
 		{
-			New("test limit").SetExample(Example{[]string{"abc", "def"}, "example", "%d|"}).SetLimit(2),
+			New("no example multiple inputs with fixed prefix"),
+			[]string{"test1", "test2"},
+			"test|",
+			[]string{"no example multiple inputs with fixed prefix\nInput:\"\"\"\ntest|test1\ntest|test2\n\"\"\"\nOutput:"},
+		},
+		{
+			New("test limit").SetExample(Example{[]string{"abc", "def"}, "example"}).SetLimit(2),
 			[]string{"test1", "test2", "test3", "test4"},
 			"%d|",
 			[]string{
-				"test limit\nExample:\nInput:\"\"\"\n1|abc\n2|def\n\"\"\"\nOutput: example\n###\nInput:\"\"\"\n1|test1\n2|test2\n\"\"\"\nOutput:",
-				"test limit\nExample:\nInput:\"\"\"\n1|abc\n2|def\n\"\"\"\nOutput: example\n###\nInput:\"\"\"\n3|test3\n4|test4\n\"\"\"\nOutput:",
+				"test limit\n###\nExample:\nInput:\"\"\"\n1|abc\n2|def\n\"\"\"\nOutput: example\n###\nInput:\"\"\"\n1|test1\n2|test2\n\"\"\"\nOutput:",
+				"test limit\n###\nExample:\nInput:\"\"\"\n1|abc\n2|def\n\"\"\"\nOutput: example\n###\nInput:\"\"\"\n3|test3\n4|test4\n\"\"\"\nOutput:",
 			},
 		},
 	} {
