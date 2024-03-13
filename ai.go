@@ -2,9 +2,12 @@ package ai
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/url"
 )
+
+var ErrAIClosed = errors.New("AI client is nil or already closed")
 
 type AI interface {
 	Limiter
