@@ -2,6 +2,7 @@ package gemini
 
 import (
 	"context"
+	"errors"
 	"io"
 	"strings"
 
@@ -18,7 +19,7 @@ const defaultModel = "gemini-1.0-pro"
 var _ ai.AI = new(Gemini)
 
 type Gemini struct {
-	*genai.Client
+	c      *genai.Client
 	model  *genai.GenerativeModel
 	config genai.GenerationConfig
 
@@ -34,7 +35,7 @@ func New(apiKey string) (ai.AI, error) {
 }
 
 func NewWithClient(client *genai.Client) ai.AI {
-	return &Gemini{Client: client, model: client.GenerativeModel(defaultModel)}
+	return &Gemini{c: client, model: client.GenerativeModel(defaultModel)}
 }
 
 func (gemini *Gemini) SetLimit(limit rate.Limit) {
@@ -49,7 +50,7 @@ func (ai *Gemini) wait(ctx context.Context) error {
 }
 
 func (ai *Gemini) SetModel(model string) {
-	ai.model = ai.GenerativeModel(model)
+	ai.model = ai.c.GenerativeModel(model)
 	ai.model.GenerationConfig = ai.config
 }
 
@@ -79,6 +80,13 @@ func (resp *ChatResponse) Results() (res []string) {
 	return
 }
 
+func (resp *ChatResponse) String() string {
+	if res := resp.Results(); len(res) > 0 {
+		return res[0]
+	}
+	return ""
+}
+
 func texts2parts(texts []string) (parts []genai.Part) {
 	for _, i := range texts {
 		parts = append(parts, genai.Text(i))
@@ -100,11 +108,14 @@ func (ai *Gemini) Chat(ctx context.Context, parts ...string) (ai.ChatResponse, e
 var _ ai.ChatStream = new(ChatStream)
 
 type ChatStream struct {
-	*genai.GenerateContentResponseIterator
+	iter *genai.GenerateContentResponseIterator
 }
 
 func (stream *ChatStream) Next() (ai.ChatResponse, error) {
-	resp, err := stream.GenerateContentResponseIterator.Next()
+	if stream.iter == nil {
+		return nil, errors.New("stream iterator is nil or already closed")
+	}
+	resp, err := stream.iter.Next()
 	if err != nil {
 		if err == iterator.Done {
 			return nil, io.EOF
@@ -115,6 +126,7 @@ func (stream *ChatStream) Next() (ai.ChatResponse, error) {
 }
 
 func (stream *ChatStream) Close() error {
+	stream.iter = nil
 	return nil
 }
 
@@ -129,14 +141,14 @@ var _ ai.Chatbot = new(ChatSession)
 
 type ChatSession struct {
 	ai *Gemini
-	*genai.ChatSession
+	cs *genai.ChatSession
 }
 
 func (session *ChatSession) Chat(ctx context.Context, parts ...string) (ai.ChatResponse, error) {
 	if err := session.ai.wait(ctx); err != nil {
 		return nil, err
 	}
-	resp, err := session.SendMessage(ctx, texts2parts(parts)...)
+	resp, err := session.cs.SendMessage(ctx, texts2parts(parts)...)
 	if err != nil {
 		return nil, err
 	}
@@ -147,9 +159,13 @@ func (session *ChatSession) ChatStream(ctx context.Context, parts ...string) (ai
 	if err := session.ai.wait(ctx); err != nil {
 		return nil, err
 	}
-	return &ChatStream{session.SendMessageStream(ctx, texts2parts(parts)...)}, nil
+	return &ChatStream{session.cs.SendMessageStream(ctx, texts2parts(parts)...)}, nil
 }
 
 func (ai *Gemini) ChatSession() ai.Chatbot {
 	return &ChatSession{ai, ai.model.StartChat()}
+}
+
+func (ai *Gemini) Close() error {
+	return ai.c.Close()
 }

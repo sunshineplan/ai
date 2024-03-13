@@ -15,7 +15,7 @@ const defaultModel = openai.GPT3Dot5Turbo
 var _ ai.AI = new(ChatGPT)
 
 type ChatGPT struct {
-	*openai.Client
+	c           *openai.Client
 	model       string
 	maxTokens   *int32
 	temperature *float32
@@ -30,7 +30,10 @@ func New(authToken string) ai.AI {
 }
 
 func NewWithClient(client *openai.Client) ai.AI {
-	return &ChatGPT{Client: client, model: defaultModel}
+	if client == nil {
+		panic("cannot create AI from nil client")
+	}
+	return &ChatGPT{c: client, model: defaultModel}
 }
 
 func (chatgpt *ChatGPT) SetLimit(limit rate.Limit) {
@@ -74,12 +77,23 @@ func (resp *ChatResponse[Response]) Results() (res []string) {
 	return
 }
 
-func (ai *ChatGPT) createRequest(history []openai.ChatCompletionMessage, messages ...string) (req openai.ChatCompletionRequest) {
+func (resp *ChatResponse[Response]) String() string {
+	if res := resp.Results(); len(res) > 0 {
+		return res[0]
+	}
+	return ""
+}
+
+func (ai *ChatGPT) createRequest(
+	stream bool,
+	history []openai.ChatCompletionMessage,
+	messages ...string,
+) (req openai.ChatCompletionRequest) {
 	req.Model = ai.model
 	if ai.maxTokens != nil {
 		req.MaxTokens = int(*ai.maxTokens)
 	}
-	if ai.count != nil {
+	if !stream && ai.count != nil {
 		req.N = int(*ai.count)
 	}
 	if ai.temperature != nil {
@@ -98,15 +112,19 @@ func (ai *ChatGPT) createRequest(history []openai.ChatCompletionMessage, message
 	return
 }
 
-func (ai *ChatGPT) chat(
+func (chatgpt *ChatGPT) chat(
 	ctx context.Context,
 	history []openai.ChatCompletionMessage,
 	messages ...string,
 ) (resp openai.ChatCompletionResponse, err error) {
-	if err = ai.wait(ctx); err != nil {
+	if chatgpt.c == nil {
+		err = ai.ErrAIClosed
 		return
 	}
-	return ai.CreateChatCompletion(ctx, ai.createRequest(history, messages...))
+	if err = chatgpt.wait(ctx); err != nil {
+		return
+	}
+	return chatgpt.c.CreateChatCompletion(ctx, chatgpt.createRequest(false, history, messages...))
 }
 
 func (ai *ChatGPT) Chat(ctx context.Context, messages ...string) (ai.ChatResponse, error) {
@@ -120,40 +138,47 @@ func (ai *ChatGPT) Chat(ctx context.Context, messages ...string) (ai.ChatRespons
 var _ ai.ChatStream = new(ChatStream)
 
 type ChatStream struct {
-	*openai.ChatCompletionStream
-	cs      *ChatSession
-	content string
+	sr     *openai.ChatCompletionStream
+	cs     *ChatSession
+	merged string
 }
 
 func (stream *ChatStream) Next() (ai.ChatResponse, error) {
-	resp, err := stream.Recv()
+	resp, err := stream.sr.Recv()
 	if err != nil {
 		if err == io.EOF {
 			if stream.cs != nil {
 				stream.cs.History = append(stream.cs.History, openai.ChatCompletionMessage{
-					Role: openai.ChatMessageRoleAssistant, Content: stream.content})
+					Role: openai.ChatMessageRoleAssistant, Content: stream.merged})
 			}
 		}
-		stream.content = ""
+		stream.merged = ""
 		return nil, err
 	}
 	if stream.cs != nil {
-		stream.content += resp.Choices[0].Delta.Content
+		stream.merged += resp.Choices[0].Delta.Content
 	}
 	return &ChatResponse[openai.ChatCompletionStreamResponse]{resp}, nil
 }
 
-func (ai *ChatGPT) chatStream(
+func (stream *ChatStream) Close() error {
+	return stream.sr.Close()
+}
+
+func (chatgpt *ChatGPT) chatStream(
 	ctx context.Context,
 	history []openai.ChatCompletionMessage,
 	messages ...string,
 ) (*openai.ChatCompletionStream, error) {
-	if err := ai.wait(ctx); err != nil {
+	if chatgpt.c == nil {
+		return nil, ai.ErrAIClosed
+	}
+	if err := chatgpt.wait(ctx); err != nil {
 		return nil, err
 	}
-	req := ai.createRequest(history, messages...)
+	req := chatgpt.createRequest(true, history, messages...)
 	req.Stream = true
-	return ai.CreateChatCompletionStream(ctx, req)
+	return chatgpt.c.CreateChatCompletionStream(ctx, req)
 }
 
 func (ai *ChatGPT) ChatStream(ctx context.Context, messages ...string) (ai.ChatStream, error) {
@@ -189,10 +214,10 @@ func (session *ChatSession) ChatStream(ctx context.Context, messages ...string) 
 }
 
 func (ai *ChatGPT) ChatSession() ai.Chatbot {
-	ai.count = nil
 	return &ChatSession{ai: ai}
 }
 
 func (ai *ChatGPT) Close() error {
+	ai.c = nil
 	return nil
 }

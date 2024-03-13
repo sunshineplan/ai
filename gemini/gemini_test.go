@@ -23,6 +23,7 @@ func TestGemini(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer gemini.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	fmt.Println("Who are you?")
@@ -39,6 +40,7 @@ func TestGemini(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stream.Close()
 	for {
 		resp, err := stream.Next()
 		if err != nil {
@@ -66,6 +68,7 @@ func TestGemini(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer stream.Close()
 	for {
 		resp, err := stream.Next()
 		if err != nil {
