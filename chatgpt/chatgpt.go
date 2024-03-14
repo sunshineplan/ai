@@ -26,6 +26,14 @@ type ChatGPT struct {
 }
 
 func New(authToken string) ai.AI {
+	return NewWithBaseURL(authToken, "")
+}
+
+func NewWithBaseURL(authToken, baseURL string) ai.AI {
+	cfg := openai.DefaultConfig(authToken)
+	if baseURL != "" {
+		cfg.BaseURL = baseURL
+	}
 	return NewWithClient(openai.NewClient(authToken))
 }
 
