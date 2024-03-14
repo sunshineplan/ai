@@ -3,7 +3,7 @@ module github.com/sunshineplan/ai
 go 1.22
 
 require (
-	github.com/google/generative-ai-go v0.9.0
+	github.com/google/generative-ai-go v0.10.0
 	github.com/sashabaranov/go-openai v1.20.3
 	github.com/sunshineplan/utils v0.1.63
 	golang.org/x/time v0.5.0
