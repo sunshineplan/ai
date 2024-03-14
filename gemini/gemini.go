@@ -27,7 +27,15 @@ type Gemini struct {
 }
 
 func New(apiKey string) (ai.AI, error) {
-	client, err := genai.NewClient(context.Background(), option.WithAPIKey(apiKey))
+	return NewWithEndpoint(apiKey, "")
+}
+
+func NewWithEndpoint(apiKey, endpoint string) (ai.AI, error) {
+	opts := []option.ClientOption{option.WithAPIKey(apiKey)}
+	if endpoint != "" {
+		opts = append(opts, option.WithEndpoint(endpoint))
+	}
+	client, err := genai.NewClient(context.Background(), opts...)
 	if err != nil {
 		return nil, err
 	}

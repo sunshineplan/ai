@@ -97,7 +97,7 @@ func TestGemini(t *testing.T) {
 	if apiKey == "" {
 		return
 	}
-	gemini, err := gemini.New(apiKey)
+	gemini, err := gemini.NewWithEndpoint(apiKey, os.Getenv("GEMINI_ENDPOINT"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func TestChatGPT(t *testing.T) {
 	if apiKey == "" {
 		return
 	}
-	chatgpt := chatgpt.New(apiKey)
+	chatgpt := chatgpt.NewWithBaseURL(apiKey, os.Getenv("CHATGPT_BASE_URL"))
 	defer chatgpt.Close()
 	if err := testChat(chatgpt, "Who are you?"); err != nil {
 		t.Error(err)

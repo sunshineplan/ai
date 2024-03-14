@@ -23,8 +23,27 @@ jobs:
           go-version: stable
 
       - name: Test Code
-        env: 
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           go build -v ./...
           go test -v -race ./...
+
+  ai:
+    if: ${{ github.actor != 'dependabot[bot]' }}
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Test Code
+        env: 
+          CHATGPT_API_KEY: ${{ secrets.CHATGPT_API_KEY }}
+          CHATGPT_BASE_URL: ${{ secrets.CHATGPT_BASE_URL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_ENDPOINT: ${{ secrets.GEMINI_ENDPOINT }}
+        run: go test -v
