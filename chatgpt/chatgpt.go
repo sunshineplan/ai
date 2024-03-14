@@ -34,7 +34,7 @@ func NewWithBaseURL(authToken, baseURL string) ai.AI {
 	if baseURL != "" {
 		cfg.BaseURL = baseURL
 	}
-	return NewWithClient(openai.NewClient(authToken))
+	return NewWithClient(openai.NewClientWithConfig(cfg))
 }
 
 func NewWithClient(client *openai.Client) ai.AI {
