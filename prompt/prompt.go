@@ -122,12 +122,13 @@ type Result struct {
 	Error  error
 }
 
-func (prompt *Prompt) Execute(ai ai.AI, input []string, prefix string) (<-chan Result, error) {
+func (prompt *Prompt) Execute(ai ai.AI, input []string, prefix string) (<-chan Result, int, error) {
 	prompts, err := prompt.execute(input, prefix)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	c := make(chan Result, len(prompts))
+	n := len(prompts)
+	c := make(chan Result, n)
 	go func() {
 		workers.RunSlice(prompt.workers, prompts, func(i int, p string) {
 			ctx, cancel := context.WithTimeout(context.Background(), prompt.d)
@@ -141,5 +142,5 @@ func (prompt *Prompt) Execute(ai ai.AI, input []string, prefix string) (<-chan R
 		})
 		close(c)
 	}()
-	return c, nil
+	return c, n, nil
 }
