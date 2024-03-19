@@ -128,15 +128,18 @@ func (prompt *Prompt) Execute(ai ai.AI, input []string, prefix string) (<-chan R
 		return nil, err
 	}
 	c := make(chan Result, len(prompts))
-	go workers.RunSlice(prompt.workers, prompts, func(i int, p string) {
-		ctx, cancel := context.WithTimeout(context.Background(), prompt.d)
-		defer cancel()
-		resp, err := ai.Chat(ctx, p)
-		if err != nil {
-			c <- Result{i, p, nil, err}
-		} else {
-			c <- Result{i, p, resp.Results(), nil}
-		}
-	})
+	go func() {
+		workers.RunSlice(prompt.workers, prompts, func(i int, p string) {
+			ctx, cancel := context.WithTimeout(context.Background(), prompt.d)
+			defer cancel()
+			resp, err := ai.Chat(ctx, p)
+			if err != nil {
+				c <- Result{i, p, nil, err}
+			} else {
+				c <- Result{i, p, resp.Results(), nil}
+			}
+		})
+		close(c)
+	}()
 	return c, nil
 }
