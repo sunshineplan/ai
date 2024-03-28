@@ -46,6 +46,10 @@ func NewWithClient(client *genai.Client) ai.AI {
 	return &Gemini{c: client, model: client.GenerativeModel(defaultModel)}
 }
 
+func (Gemini) LLMs() ai.LLMs {
+	return ai.Gemini
+}
+
 func (gemini *Gemini) SetLimit(limit rate.Limit) {
 	gemini.limiter = ai.NewLimiter(limit)
 }
