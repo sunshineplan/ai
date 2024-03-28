@@ -44,6 +44,10 @@ func NewWithClient(client *openai.Client) ai.AI {
 	return &ChatGPT{c: client, model: defaultModel}
 }
 
+func (ChatGPT) LLMs() ai.LLMs {
+	return ai.ChatGPT
+}
+
 func (chatgpt *ChatGPT) SetLimit(limit rate.Limit) {
 	chatgpt.limiter = ai.NewLimiter(limit)
 }
