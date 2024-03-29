@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/sunshineplan/ai"
@@ -26,24 +28,43 @@ type Gemini struct {
 	limiter *rate.Limiter
 }
 
-func New(apiKey string) (ai.AI, error) {
-	return NewWithEndpoint(apiKey, "")
-}
-
-func NewWithEndpoint(apiKey, endpoint string) (ai.AI, error) {
-	opts := []option.ClientOption{option.WithAPIKey(apiKey)}
-	if endpoint != "" {
-		opts = append(opts, option.WithEndpoint(endpoint))
+func New(opts ...ai.ClientOption) (ai.AI, error) {
+	cfg := new(ai.ClientConfig)
+	for _, i := range opts {
+		i.Apply(cfg)
 	}
-	client, err := genai.NewClient(context.Background(), opts...)
+	o := []option.ClientOption{option.WithAPIKey(cfg.APIKey)}
+	if cfg.Proxy != "" {
+		u, err := url.Parse(cfg.Proxy)
+		if err != nil {
+			return nil, err
+		}
+		if t, ok := http.DefaultTransport.(*http.Transport); ok {
+			t = t.Clone()
+			t.Proxy = http.ProxyURL(u)
+			o = append(o, option.WithHTTPClient(&http.Client{Transport: &apikey{cfg.APIKey, t}}))
+		}
+	}
+	if cfg.Endpoint != "" {
+		o = append(o, option.WithEndpoint(cfg.Endpoint))
+	}
+	client, err := genai.NewClient(context.Background(), o...)
 	if err != nil {
 		return nil, err
 	}
-	return NewWithClient(client), nil
+	c := NewWithClient(client, cfg.Model)
+	if cfg.Limit != nil {
+		c.SetLimit(*cfg.Limit)
+	}
+	ai.ApplyModelConfig(c, cfg.ModelConfig)
+	return c, nil
 }
 
-func NewWithClient(client *genai.Client) ai.AI {
-	return &Gemini{c: client, model: client.GenerativeModel(defaultModel)}
+func NewWithClient(client *genai.Client, model string) ai.AI {
+	if model == "" {
+		model = defaultModel
+	}
+	return &Gemini{c: client, model: client.GenerativeModel(model)}
 }
 
 func (Gemini) LLMs() ai.LLMs {

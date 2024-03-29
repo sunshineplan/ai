@@ -3,6 +3,8 @@ package chatgpt
 import (
 	"context"
 	"io"
+	"net/http"
+	"net/url"
 
 	"github.com/sunshineplan/ai"
 
@@ -25,23 +27,42 @@ type ChatGPT struct {
 	limiter *rate.Limiter
 }
 
-func New(authToken string) ai.AI {
-	return NewWithBaseURL(authToken, "")
-}
-
-func NewWithBaseURL(authToken, baseURL string) ai.AI {
-	cfg := openai.DefaultConfig(authToken)
-	if baseURL != "" {
-		cfg.BaseURL = baseURL
+func New(opts ...ai.ClientOption) (ai.AI, error) {
+	cfg := new(ai.ClientConfig)
+	for _, i := range opts {
+		i.Apply(cfg)
 	}
-	return NewWithClient(openai.NewClientWithConfig(cfg))
+	config := openai.DefaultConfig(cfg.APIKey)
+	if cfg.Endpoint != "" {
+		config.BaseURL = cfg.Endpoint
+	}
+	if cfg.Proxy != "" {
+		u, err := url.Parse(cfg.Proxy)
+		if err != nil {
+			return nil, err
+		}
+		if t, ok := http.DefaultTransport.(*http.Transport); ok {
+			t = t.Clone()
+			t.Proxy = http.ProxyURL(u)
+			config.HTTPClient = &http.Client{Transport: t}
+		}
+	}
+	c := NewWithClient(openai.NewClientWithConfig(config), cfg.Model)
+	if cfg.Limit != nil {
+		c.SetLimit(*cfg.Limit)
+	}
+	ai.ApplyModelConfig(c, cfg.ModelConfig)
+	return c, nil
 }
 
-func NewWithClient(client *openai.Client) ai.AI {
+func NewWithClient(client *openai.Client, model string) ai.AI {
 	if client == nil {
 		panic("cannot create AI from nil client")
 	}
-	return &ChatGPT{c: client, model: defaultModel}
+	if model == "" {
+		model = defaultModel
+	}
+	return &ChatGPT{c: client, model: model}
 }
 
 func (ChatGPT) LLMs() ai.LLMs {

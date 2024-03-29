@@ -43,7 +43,11 @@ jobs:
       - name: Test Code
         env: 
           CHATGPT_API_KEY: ${{ secrets.CHATGPT_API_KEY }}
-          CHATGPT_BASE_URL: ${{ secrets.CHATGPT_BASE_URL }}
+          CHATGPT_PROXY: ${{ secrets.CHATGPT_PROXY }}
+          CHATGPT_ENDPOINT: ${{ secrets.CHATGPT_ENDPOINT }}
+          CHATGPT_MODEL: ${{ secrets.CHATGPT_MODEL }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_PROXY: ${{ secrets.GEMINI_PROXY }}
           GEMINI_ENDPOINT: ${{ secrets.GEMINI_ENDPOINT }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
         run: go test -v

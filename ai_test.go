@@ -13,12 +13,6 @@ import (
 	"github.com/sunshineplan/ai/gemini"
 )
 
-func init() {
-	if proxy := os.Getenv("AI_PROXY"); proxy != "" {
-		ai.SetProxy(proxy)
-	}
-}
-
 func testChat(ai ai.AI, prompt string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
@@ -97,11 +91,18 @@ func TestGemini(t *testing.T) {
 	if apiKey == "" {
 		return
 	}
-	gemini, err := gemini.NewWithEndpoint(apiKey, os.Getenv("GEMINI_ENDPOINT"))
+	gemini, err := gemini.New(
+		ai.WithAPIKey(apiKey),
+		ai.WithEndpoint(os.Getenv("GEMINI_ENDPOINT")),
+		ai.WithProxy(os.Getenv("GEMINI_PROXY")),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer gemini.Close()
+	if model := os.Getenv("GEMINI_MODEL"); model != "" {
+		gemini.SetModel(model)
+	}
 	if err := testChat(gemini, "Who are you?"); err != nil {
 		t.Error(err)
 	}
@@ -118,8 +119,18 @@ func TestChatGPT(t *testing.T) {
 	if apiKey == "" {
 		return
 	}
-	chatgpt := chatgpt.NewWithBaseURL(apiKey, os.Getenv("CHATGPT_BASE_URL"))
+	chatgpt, err := chatgpt.New(
+		ai.WithAPIKey(apiKey),
+		ai.WithEndpoint(os.Getenv("CHATGPT_ENDPOINT")),
+		ai.WithProxy(os.Getenv("CHATGPT_PROXY")),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer chatgpt.Close()
+	if model := os.Getenv("CHATGPT_MODEL"); model != "" {
+		chatgpt.SetModel(model)
+	}
 	if err := testChat(chatgpt, "Who are you?"); err != nil {
 		t.Error(err)
 	}

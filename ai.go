@@ -3,8 +3,6 @@ package ai
 import (
 	"context"
 	"errors"
-	"net/http"
-	"net/url"
 )
 
 var ErrAIClosed = errors.New("AI client is nil or already closed")
@@ -52,13 +50,4 @@ type ChatStream interface {
 
 type ChatResponse interface {
 	Results() []string
-}
-
-func SetProxy(proxy string) error {
-	u, err := url.Parse(proxy)
-	if err != nil {
-		return err
-	}
-	http.DefaultTransport.(*http.Transport).Proxy = http.ProxyURL(u)
-	return nil
 }
