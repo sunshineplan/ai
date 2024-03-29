@@ -69,10 +69,6 @@ func (ChatGPT) LLMs() ai.LLMs {
 	return ai.ChatGPT
 }
 
-func (ChatGPT) LLMs() ai.LLMs {
-	return ai.ChatGPT
-}
-
 func (chatgpt *ChatGPT) SetLimit(limit rate.Limit) {
 	chatgpt.limiter = ai.NewLimiter(limit)
 }

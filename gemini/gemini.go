@@ -71,10 +71,6 @@ func (Gemini) LLMs() ai.LLMs {
 	return ai.Gemini
 }
 
-func (Gemini) LLMs() ai.LLMs {
-	return ai.Gemini
-}
-
 func (gemini *Gemini) SetLimit(limit rate.Limit) {
 	gemini.limiter = ai.NewLimiter(limit)
 }
