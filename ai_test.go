@@ -95,14 +95,12 @@ func TestGemini(t *testing.T) {
 		ai.WithAPIKey(apiKey),
 		ai.WithEndpoint(os.Getenv("GEMINI_ENDPOINT")),
 		ai.WithProxy(os.Getenv("GEMINI_PROXY")),
+		ai.WithModel(os.Getenv("CHATGPT_MODEL")),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer gemini.Close()
-	if model := os.Getenv("GEMINI_MODEL"); model != "" {
-		gemini.SetModel(model)
-	}
 	if err := testChat(gemini, "Who are you?"); err != nil {
 		t.Error(err)
 	}
@@ -123,14 +121,12 @@ func TestChatGPT(t *testing.T) {
 		ai.WithAPIKey(apiKey),
 		ai.WithEndpoint(os.Getenv("CHATGPT_ENDPOINT")),
 		ai.WithProxy(os.Getenv("CHATGPT_PROXY")),
+		ai.WithModel(os.Getenv("CHATGPT_MODEL")),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer chatgpt.Close()
-	if model := os.Getenv("CHATGPT_MODEL"); model != "" {
-		chatgpt.SetModel(model)
-	}
 	if err := testChat(chatgpt, "Who are you?"); err != nil {
 		t.Error(err)
 	}
