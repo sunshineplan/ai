@@ -45,7 +45,8 @@ func WithAPIKey(apiKey string) ClientOption           { return withAPIKey(apiKey
 func WithEndpoint(endpoint string) ClientOption       { return withEndpoint(endpoint) }
 func WithProxy(proxy string) ClientOption             { return withProxy(proxy) }
 func WithLimit(limit rate.Limit) ClientOption         { return withLimit(limit) }
-func WithModelConfig(config ModelConfig) ClientOption { return withModel(config) }
+func WithModel(model string) ClientOption             { return withModel(model) }
+func WithModelConfig(config ModelConfig) ClientOption { return withModelConfig(config) }
 
 type withAPIKey string
 
@@ -63,6 +64,10 @@ type withLimit rate.Limit
 
 func (w withLimit) Apply(cfg *ClientConfig) { cfg.Limit = (*rate.Limit)(&w) }
 
-type withModel ModelConfig
+type withModel string
 
-func (w withModel) Apply(cfg *ClientConfig) { cfg.ModelConfig = ModelConfig(w) }
+func (w withModel) Apply(cfg *ClientConfig) { cfg.Model = string(w) }
+
+type withModelConfig ModelConfig
+
+func (w withModelConfig) Apply(cfg *ClientConfig) { cfg.ModelConfig = ModelConfig(w) }
