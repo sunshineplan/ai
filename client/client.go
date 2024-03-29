@@ -8,40 +8,26 @@ import (
 	"github.com/sunshineplan/ai/gemini"
 )
 
-func New(cfg ai.Config) (client ai.AI, err error) {
-	switch cfg.LLMs {
-	case "":
+func New(cfg ai.ClientConfig) (client ai.AI, err error) {
+	if cfg.LLMs == "" {
 		return nil, errors.New("empty AI")
-	case ai.ChatGPT:
-		client = chatgpt.NewWithBaseURL(cfg.APIKey, cfg.BaseURL)
-	case ai.Gemini:
-		client, err = gemini.NewWithEndpoint(cfg.APIKey, cfg.BaseURL)
-		if err != nil {
-			return
-		}
-	default:
-		return nil, errors.New("unknown LLMs: " + string(cfg.LLMs))
 	}
-	if cfg.Model != "" {
-		client.SetModel(cfg.Model)
-	}
-	if cfg.Proxy != "" {
-		ai.SetProxy(cfg.Proxy)
-	}
-	if cfg.Count != nil {
-		client.SetCount(*cfg.Count)
-	}
-	if cfg.MaxTokens != nil {
-		client.SetMaxTokens(*cfg.MaxTokens)
-	}
-	if cfg.Temperature != nil {
-		client.SetTemperature(*cfg.Temperature)
-	}
-	if cfg.TopP != nil {
-		client.SetTopP(*cfg.TopP)
+	opts := []ai.ClientOption{
+		ai.WithAPIKey(cfg.APIKey),
+		ai.WithEndpoint(cfg.Endpoint),
+		ai.WithProxy(cfg.Proxy),
+		ai.WithModelConfig(cfg.ModelConfig),
 	}
 	if cfg.Limit != nil {
-		client.SetLimit(*cfg.Limit)
+		opts = append(opts, ai.WithLimit(*cfg.Limit))
+	}
+	switch cfg.LLMs {
+	case ai.ChatGPT:
+		client, err = chatgpt.New(opts...)
+	case ai.Gemini:
+		client, err = gemini.New(opts...)
+	default:
+		err = errors.New("unknown LLMs: " + string(cfg.LLMs))
 	}
 	return
 }
