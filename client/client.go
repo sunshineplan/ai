@@ -16,6 +16,7 @@ func New(cfg ai.ClientConfig) (client ai.AI, err error) {
 		ai.WithAPIKey(cfg.APIKey),
 		ai.WithEndpoint(cfg.Endpoint),
 		ai.WithProxy(cfg.Proxy),
+		ai.WithModel(cfg.Model),
 		ai.WithModelConfig(cfg.ModelConfig),
 	}
 	if cfg.Limit != nil {
