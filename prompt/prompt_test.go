@@ -53,7 +53,7 @@ func TestPrompt(t *testing.T) {
 			[]string{"no example multiple inputs with fixed prefix\nInput:\"\"\"\ntest|test1\ntest|test2\n\"\"\"\nOutput:"},
 		},
 		{
-			New("test limit").SetExample(Example{[]string{"abc", "def"}, "example"}).SetLimit(2),
+			New("test limit").SetExample(Example{[]string{"abc", "def"}, "example"}).SetInputN(2),
 			[]string{"test1", "test2", "test3", "test4"},
 			"%d|",
 			[]string{

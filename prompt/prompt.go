@@ -47,7 +47,7 @@ type Prompt struct {
 	prompt string
 	t      *template.Template
 	ex     *Example
-	limit  int
+	n      int
 
 	d       time.Duration
 	workers int
@@ -69,8 +69,8 @@ func (prompt *Prompt) SetExample(ex Example) *Prompt {
 	return prompt
 }
 
-func (prompt *Prompt) SetLimit(limit int) *Prompt {
-	prompt.limit = limit
+func (prompt *Prompt) SetInputN(n int) *Prompt {
+	prompt.n = n
 	return prompt
 }
 
@@ -89,16 +89,16 @@ func (prompt *Prompt) execute(input []string, prefix string) (prompts []string, 
 	if length == 0 {
 		return
 	}
-	limit := prompt.limit
-	if limit == 0 {
-		limit = length
+	n := prompt.n
+	if n == 0 {
+		n = length
 	}
-	for n := 0; n < length; n = n + limit {
+	for i := 0; i < length; i = i + n {
 		var s []string
-		if n+limit < length {
-			s = input[n : n+limit]
+		if i+n < length {
+			s = input[i : i+n]
 		} else {
-			s = input[n:]
+			s = input[i:]
 		}
 		var b strings.Builder
 		if err = prompt.t.Execute(&b, struct {
@@ -107,7 +107,7 @@ func (prompt *Prompt) execute(input []string, prefix string) (prompts []string, 
 			Input   []string
 			Prefix  string
 			Start   int
-		}{prompt.prompt, prompt.ex, s, prefix, n}); err != nil {
+		}{prompt.prompt, prompt.ex, s, prefix, i}); err != nil {
 			return nil, err
 		}
 		prompts = append(prompts, b.String())
