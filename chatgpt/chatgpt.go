@@ -17,7 +17,7 @@ const defaultModel = openai.GPT3Dot5Turbo
 var _ ai.AI = new(ChatGPT)
 
 type ChatGPT struct {
-	c           *openai.Client
+	*openai.Client
 	model       string
 	maxTokens   *int32
 	temperature *float32
@@ -62,11 +62,15 @@ func NewWithClient(client *openai.Client, model string) ai.AI {
 	if model == "" {
 		model = defaultModel
 	}
-	return &ChatGPT{c: client, model: model}
+	return &ChatGPT{Client: client, model: model}
 }
 
 func (ChatGPT) LLMs() ai.LLMs {
 	return ai.ChatGPT
+}
+
+func (chatgpt *ChatGPT) Model(_ context.Context) (string, error) {
+	return chatgpt.model, nil
 }
 
 func (chatgpt *ChatGPT) SetLimit(limit rate.Limit) {
@@ -151,14 +155,14 @@ func (chatgpt *ChatGPT) chat(
 	history []openai.ChatCompletionMessage,
 	messages ...string,
 ) (resp openai.ChatCompletionResponse, err error) {
-	if chatgpt.c == nil {
+	if chatgpt.Client == nil {
 		err = ai.ErrAIClosed
 		return
 	}
 	if err = chatgpt.wait(ctx); err != nil {
 		return
 	}
-	return chatgpt.c.CreateChatCompletion(ctx, chatgpt.createRequest(session, history, messages...))
+	return chatgpt.CreateChatCompletion(ctx, chatgpt.createRequest(session, history, messages...))
 }
 
 func (ai *ChatGPT) Chat(ctx context.Context, messages ...string) (ai.ChatResponse, error) {
@@ -204,7 +208,7 @@ func (chatgpt *ChatGPT) chatStream(
 	history []openai.ChatCompletionMessage,
 	messages ...string,
 ) (*openai.ChatCompletionStream, error) {
-	if chatgpt.c == nil {
+	if chatgpt.Client == nil {
 		return nil, ai.ErrAIClosed
 	}
 	if err := chatgpt.wait(ctx); err != nil {
@@ -212,7 +216,7 @@ func (chatgpt *ChatGPT) chatStream(
 	}
 	req := chatgpt.createRequest(true, history, messages...)
 	req.Stream = true
-	return chatgpt.c.CreateChatCompletionStream(ctx, req)
+	return chatgpt.CreateChatCompletionStream(ctx, req)
 }
 
 func (ai *ChatGPT) ChatStream(ctx context.Context, messages ...string) (ai.ChatStream, error) {
@@ -270,6 +274,6 @@ func (ai *ChatGPT) ChatSession() ai.ChatSession {
 }
 
 func (ai *ChatGPT) Close() error {
-	ai.c = nil
+	ai.Client = nil
 	return nil
 }

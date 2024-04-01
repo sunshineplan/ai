@@ -21,7 +21,7 @@ const defaultModel = "gemini-1.0-pro"
 var _ ai.AI = new(Gemini)
 
 type Gemini struct {
-	c      *genai.Client
+	*genai.Client
 	model  *genai.GenerativeModel
 	config genai.GenerationConfig
 
@@ -64,11 +64,19 @@ func NewWithClient(client *genai.Client, model string) ai.AI {
 	if model == "" {
 		model = defaultModel
 	}
-	return &Gemini{c: client, model: client.GenerativeModel(model)}
+	return &Gemini{Client: client, model: client.GenerativeModel(model)}
 }
 
 func (Gemini) LLMs() ai.LLMs {
 	return ai.Gemini
+}
+
+func (gemini *Gemini) Model(ctx context.Context) (string, error) {
+	info, err := gemini.model.Info(ctx)
+	if err != nil {
+		return "", err
+	}
+	return info.Name, nil
 }
 
 func (gemini *Gemini) SetLimit(limit rate.Limit) {
@@ -83,7 +91,7 @@ func (ai *Gemini) wait(ctx context.Context) error {
 }
 
 func (ai *Gemini) SetModel(model string) {
-	ai.model = ai.c.GenerativeModel(model)
+	ai.model = ai.GenerativeModel(model)
 	ai.model.GenerationConfig = ai.config
 }
 
@@ -207,8 +215,4 @@ func (session *ChatSession) History() (history []ai.Message) {
 
 func (ai *Gemini) ChatSession() ai.ChatSession {
 	return &ChatSession{ai, ai.model.StartChat()}
-}
-
-func (ai *Gemini) Close() error {
-	return ai.c.Close()
 }
