@@ -62,7 +62,7 @@ func TestPrompt(t *testing.T) {
 			},
 		},
 	} {
-		if prompts, err := tc.prompt.execute(tc.input, tc.prefix); err != nil {
+		if prompts, err := tc.prompt.Prompts(tc.input, tc.prefix); err != nil {
 			t.Errorf("#%d: error: %s", i, err)
 		} else if !reflect.DeepEqual(prompts, tc.prompts) {
 			t.Errorf("#%d: expected %q; got %q", i, tc.prompts, prompts)
