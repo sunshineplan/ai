@@ -33,8 +33,10 @@ func New(opts ...ai.ClientOption) (ai.AI, error) {
 	for _, i := range opts {
 		i.Apply(cfg)
 	}
-	o := []option.ClientOption{option.WithAPIKey(cfg.APIKey)}
-	if cfg.Proxy != "" {
+	var o []option.ClientOption
+	if cfg.Proxy == "" {
+		o = append(o, option.WithAPIKey(cfg.APIKey))
+	} else {
 		u, err := url.Parse(cfg.Proxy)
 		if err != nil {
 			return nil, err
