@@ -95,7 +95,7 @@ func TestGemini(t *testing.T) {
 		ai.WithAPIKey(apiKey),
 		ai.WithEndpoint(os.Getenv("GEMINI_ENDPOINT")),
 		ai.WithProxy(os.Getenv("GEMINI_PROXY")),
-		ai.WithModel(os.Getenv("CHATGPT_MODEL")),
+		ai.WithModel(os.Getenv("GEMINI_MODEL")),
 	)
 	if err != nil {
 		t.Fatal(err)
