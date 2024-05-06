@@ -27,6 +27,7 @@ type Model interface {
 	SetMaxTokens(x int32)
 	SetTemperature(x float32)
 	SetTopP(x float32)
+	SetJSONResponse(b bool)
 }
 
 type Chatbot interface {

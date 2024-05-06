@@ -16,10 +16,11 @@ type ClientConfig struct {
 }
 
 type ModelConfig struct {
-	Count       *int32
-	MaxTokens   *int32
-	Temperature *float32
-	TopP        *float32
+	Count        *int32
+	MaxTokens    *int32
+	Temperature  *float32
+	TopP         *float32
+	JSONResponse *bool
 }
 
 func ApplyModelConfig(ai AI, cfg ModelConfig) {
@@ -34,6 +35,9 @@ func ApplyModelConfig(ai AI, cfg ModelConfig) {
 	}
 	if cfg.TopP != nil {
 		ai.SetTopP(*cfg.TopP)
+	}
+	if cfg.JSONResponse != nil {
+		ai.SetJSONResponse(*cfg.JSONResponse)
 	}
 }
 
