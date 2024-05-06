@@ -101,6 +101,13 @@ func (ai *Gemini) SetCount(i int32)         { ai.config.SetCandidateCount(i) }
 func (ai *Gemini) SetMaxTokens(i int32)     { ai.config.SetMaxOutputTokens(i) }
 func (ai *Gemini) SetTemperature(f float32) { ai.config.SetTemperature(f) }
 func (ai *Gemini) SetTopP(f float32)        { ai.config.SetTopP(f) }
+func (ai *Gemini) SetJSONResponse(b bool) {
+	if b {
+		ai.config.ResponseMIMEType = "application/json"
+	} else {
+		ai.config.ResponseMIMEType = "text/plain"
+	}
+}
 
 func texts2parts(texts []string) (parts []genai.Part) {
 	for _, i := range texts {

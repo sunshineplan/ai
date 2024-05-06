@@ -23,6 +23,7 @@ type ChatGPT struct {
 	temperature *float32
 	topP        *float32
 	count       *int32
+	json        *bool
 
 	limiter *rate.Limiter
 }
@@ -89,6 +90,7 @@ func (ai *ChatGPT) SetCount(i int32)         { ai.count = &i }
 func (ai *ChatGPT) SetMaxTokens(i int32)     { ai.maxTokens = &i }
 func (ai *ChatGPT) SetTemperature(f float32) { ai.temperature = &f }
 func (ai *ChatGPT) SetTopP(f float32)        { ai.topP = &f }
+func (ai *ChatGPT) SetJSONResponse(b bool)   { ai.json = &b }
 
 type ChatGPTResponse interface {
 	openai.ChatCompletionResponse | openai.ChatCompletionStreamResponse
@@ -138,6 +140,11 @@ func (ai *ChatGPT) createRequest(
 	}
 	if ai.topP != nil {
 		req.TopP = *ai.topP
+	}
+	if ai.json != nil && *ai.json {
+		req.ResponseFormat = &openai.ChatCompletionResponseFormat{
+			Type: openai.ChatCompletionResponseFormatTypeJSONObject,
+		}
 	}
 	req.Messages = history
 	for _, i := range messages {
