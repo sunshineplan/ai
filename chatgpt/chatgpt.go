@@ -200,7 +200,7 @@ func (stream *ChatStream) Next() (ai.ChatResponse, error) {
 		stream.merged = ""
 		return nil, err
 	}
-	if stream.cs != nil {
+	if stream.cs != nil && len(resp.Choices) > 0 {
 		stream.merged += resp.Choices[0].Delta.Content
 	}
 	return &ChatResponse[openai.ChatCompletionStreamResponse]{resp}, nil
@@ -256,7 +256,9 @@ func (session *ChatSession) Chat(ctx context.Context, messages ...string) (ai.Ch
 		return nil, err
 	}
 	addToHistory(&session.history, openai.ChatMessageRoleUser, messages...)
-	session.history = append(session.history, resp.Choices[0].Message)
+	if len(resp.Choices) > 0 {
+		session.history = append(session.history, resp.Choices[0].Message)
+	}
 	return &ChatResponse[openai.ChatCompletionResponse]{resp}, nil
 }
 
