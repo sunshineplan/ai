@@ -7,13 +7,13 @@ require (
 	github.com/sashabaranov/go-openai v1.23.1
 	github.com/sunshineplan/utils v0.1.65
 	golang.org/x/time v0.5.0
-	google.golang.org/api v0.178.0
+	google.golang.org/api v0.180.0
 )
 
 require (
 	cloud.google.com/go v0.113.0 // indirect
 	cloud.google.com/go/ai v0.5.0 // indirect
-	cloud.google.com/go/auth v0.4.0 // indirect
+	cloud.google.com/go/auth v0.4.1 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.2 // indirect
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	cloud.google.com/go/longrunning v0.5.7 // indirect
