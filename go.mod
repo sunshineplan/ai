@@ -3,7 +3,7 @@ module github.com/sunshineplan/ai
 go 1.22
 
 require (
-	github.com/google/generative-ai-go v0.13.0
+	github.com/google/generative-ai-go v0.14.0
 	github.com/sashabaranov/go-openai v1.24.1
 	github.com/sunshineplan/utils v0.1.66
 	golang.org/x/time v0.5.0
@@ -12,7 +12,7 @@ require (
 
 require (
 	cloud.google.com/go v0.114.0 // indirect
-	cloud.google.com/go/ai v0.5.0 // indirect
+	cloud.google.com/go/ai v0.6.0 // indirect
 	cloud.google.com/go/auth v0.5.1 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.2 // indirect
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
