@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/sunshineplan/ai"
-	"github.com/sunshineplan/utils/workers"
+	"github.com/sunshineplan/workers"
 )
 
 const (
@@ -50,7 +50,7 @@ type Prompt struct {
 	n      int
 
 	d       time.Duration
-	workers int
+	workers int64
 }
 
 func New(prompt string) *Prompt {
@@ -79,7 +79,7 @@ func (prompt *Prompt) SetAITimeout(d time.Duration) *Prompt {
 	return prompt
 }
 
-func (prompt *Prompt) SetWorkers(n int) *Prompt {
+func (prompt *Prompt) SetWorkers(n int64) *Prompt {
 	prompt.workers = n
 	return prompt
 }
@@ -122,31 +122,57 @@ type Result struct {
 	Error  error
 }
 
-func (prompt *Prompt) Execute(ai ai.AI, input []string, prefix string) (<-chan Result, int, error) {
+func (prompt *Prompt) Execute(ai ai.AI, input []string, prefix string) (<-chan *Result, int, error) {
 	prompts, err := prompt.Prompts(input, prefix)
 	if err != nil {
 		return nil, 0, err
 	}
 	n := len(prompts)
-	c := make(chan Result, n)
+	c := make(chan *Result, n)
 	go func() {
-		workers.RunSlice(prompt.workers, prompts, func(i int, p string) {
-			var ctx context.Context
-			var cancel context.CancelFunc
-			if prompt.d != 0 {
-				ctx, cancel = context.WithTimeout(context.Background(), prompt.d)
-			} else {
-				ctx, cancel = context.WithCancel(context.Background())
-			}
-			defer cancel()
-			resp, err := ai.Chat(ctx, p)
+		workers.NewWorkers(prompt.workers).Run(context.Background(), workers.SliceJob(prompts, func(i int, p string) {
+			resp, err := chat(ai, prompt.d, p)
 			if err != nil {
-				c <- Result{i, p, nil, err}
+				c <- &Result{i, p, nil, err}
 			} else {
-				c <- Result{i, p, resp.Results(), nil}
+				c <- &Result{i, p, resp.Results(), nil}
 			}
-		})
+		}))
 		close(c)
 	}()
 	return c, n, nil
+}
+
+func (prompt *Prompt) JobList(ai ai.AI, input []string, prefix string, c chan<- *Result) (*workers.JobList[*Result], error) {
+	prompts, err := prompt.Prompts(input, prefix)
+	if err != nil {
+		return nil, err
+	}
+	jobList := workers.NewJobList(workers.NewWorkers(prompt.workers), func(r *Result) {
+		resp, err := chat(ai, prompt.d, r.Prompt)
+		if err != nil {
+			r.Result = nil
+			r.Error = err
+		} else {
+			r.Result = resp.Results()
+			r.Error = nil
+		}
+		c <- r
+	})
+	for i, p := range prompts {
+		jobList.PushBack(&Result{Index: i, Prompt: p})
+	}
+	return jobList, nil
+}
+
+func chat(ai ai.AI, d time.Duration, p string) (ai.ChatResponse, error) {
+	var ctx context.Context
+	var cancel context.CancelFunc
+	if d > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), d)
+	} else {
+		ctx, cancel = context.WithCancel(context.Background())
+	}
+	defer cancel()
+	return ai.Chat(ctx, p)
 }
