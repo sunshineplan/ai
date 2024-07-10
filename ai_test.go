@@ -22,6 +22,7 @@ func testChat(ai ai.AI, prompt string) error {
 		return err
 	}
 	fmt.Println(resp.Results())
+	fmt.Println(resp.TokenCount())
 	fmt.Println("---")
 	return nil
 }
@@ -44,6 +45,7 @@ func testChatStream(ai ai.AI, prompt string) error {
 			return err
 		}
 		fmt.Println(resp.Results())
+		fmt.Println(resp.TokenCount())
 	}
 	fmt.Println("---")
 	return nil
@@ -76,6 +78,7 @@ func testChatSession(ai ai.AI) error {
 			return err
 		}
 		fmt.Println(resp.Results())
+		fmt.Println(resp.TokenCount())
 	}
 	fmt.Println("---")
 	fmt.Println("History")
@@ -101,7 +104,7 @@ func TestGemini(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer gemini.Close()
-	if err := testChat(gemini, "Who are you?"); err != nil {
+	if err := testChat(gemini, "Hello!"); err != nil {
 		t.Error(err)
 	}
 	if err := testChatStream(gemini, "Who am I?"); err != nil {
