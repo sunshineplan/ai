@@ -50,6 +50,13 @@ type ChatStream interface {
 	Close() error
 }
 
+type TokenCount struct {
+	Prompt int
+	Result int
+	Total  int
+}
+
 type ChatResponse interface {
 	Results() []string
+	TokenCount() TokenCount
 }

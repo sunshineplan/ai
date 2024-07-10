@@ -140,6 +140,15 @@ func (resp *ChatResponse) Results() (res []string) {
 	return
 }
 
+func (resp *ChatResponse) TokenCount() (res ai.TokenCount) {
+	if usage := resp.UsageMetadata; usage != nil {
+		res.Prompt = int(usage.PromptTokenCount)
+		res.Result = int(usage.CandidatesTokenCount)
+		res.Total = int(usage.TotalTokenCount)
+	}
+	return
+}
+
 func (resp *ChatResponse) String() string {
 	if res := resp.Results(); len(res) > 0 {
 		return res[0]
