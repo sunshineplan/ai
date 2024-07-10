@@ -119,6 +119,7 @@ type Result struct {
 	Index  int
 	Prompt string
 	Result []string
+	Tokens int
 	Error  error
 }
 
@@ -133,9 +134,9 @@ func (prompt *Prompt) Execute(ai ai.AI, input []string, prefix string) (<-chan *
 		workers.NewWorkers(prompt.workers).Run(context.Background(), workers.SliceJob(prompts, func(i int, p string) {
 			resp, err := chat(ai, prompt.d, p)
 			if err != nil {
-				c <- &Result{i, p, nil, err}
+				c <- &Result{i, p, nil, 0, err}
 			} else {
-				c <- &Result{i, p, resp.Results(), nil}
+				c <- &Result{i, p, resp.Results(), resp.TokenCount().Total, nil}
 			}
 		}))
 		close(c)
