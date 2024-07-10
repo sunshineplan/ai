@@ -116,6 +116,22 @@ func (resp *ChatResponse[Response]) Results() (res []string) {
 	return
 }
 
+func (resp *ChatResponse[Response]) TokenCount() (res ai.TokenCount) {
+	switch v := any(resp.resp).(type) {
+	case openai.ChatCompletionResponse:
+		res.Prompt = v.Usage.PromptTokens
+		res.Result = v.Usage.CompletionTokens
+		res.Total = v.Usage.TotalTokens
+	case openai.ChatCompletionStreamResponse:
+		if usage := v.Usage; usage != nil {
+			res.Prompt = usage.PromptTokens
+			res.Result = usage.CompletionTokens
+			res.Total = usage.TotalTokens
+		}
+	}
+	return
+}
+
 func (resp *ChatResponse[Response]) String() string {
 	if res := resp.Results(); len(res) > 0 {
 		return res[0]
