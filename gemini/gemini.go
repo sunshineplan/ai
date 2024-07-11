@@ -28,7 +28,7 @@ type Gemini struct {
 	limiter *rate.Limiter
 }
 
-func New(opts ...ai.ClientOption) (ai.AI, error) {
+func New(ctx context.Context, opts ...ai.ClientOption) (ai.AI, error) {
 	cfg := new(ai.ClientConfig)
 	for _, i := range opts {
 		i.Apply(cfg)
@@ -50,7 +50,7 @@ func New(opts ...ai.ClientOption) (ai.AI, error) {
 	if cfg.Endpoint != "" {
 		o = append(o, option.WithEndpoint(cfg.Endpoint))
 	}
-	client, err := genai.NewClient(context.Background(), o...)
+	client, err := genai.NewClient(ctx, o...)
 	if err != nil {
 		return nil, err
 	}

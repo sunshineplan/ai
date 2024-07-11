@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	defaultTimeout = time.Minute
+	defaultTimeout = 5 * time.Minute
 	defaultWorkers = 3
 )
 
@@ -144,10 +144,10 @@ func (prompt *Prompt) Execute(ai ai.AI, input []string, prefix string) (<-chan *
 	return c, n, nil
 }
 
-func (prompt *Prompt) JobList(ai ai.AI, input []string, prefix string, c chan<- *Result) (*workers.JobList[*Result], error) {
+func (prompt *Prompt) JobList(ai ai.AI, input []string, prefix string, c chan<- *Result) (*workers.JobList[*Result], int, error) {
 	prompts, err := prompt.Prompts(input, prefix)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	jobList := workers.NewJobList(workers.NewWorkers(prompt.workers), func(r *Result) {
 		resp, err := chat(ai, prompt.d, r.Prompt)
@@ -163,7 +163,7 @@ func (prompt *Prompt) JobList(ai ai.AI, input []string, prefix string, c chan<- 
 	for i, p := range prompts {
 		jobList.PushBack(&Result{Index: i, Prompt: p})
 	}
-	return jobList, nil
+	return jobList, len(prompts), nil
 }
 
 func chat(ai ai.AI, d time.Duration, p string) (ai.ChatResponse, error) {

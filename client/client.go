@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"errors"
 
 	"github.com/sunshineplan/ai"
@@ -26,7 +27,7 @@ func New(cfg ai.ClientConfig) (client ai.AI, err error) {
 	case ai.ChatGPT:
 		client, err = chatgpt.New(opts...)
 	case ai.Gemini:
-		client, err = gemini.New(opts...)
+		client, err = gemini.New(context.Background(), opts...)
 	default:
 		err = errors.New("unknown LLMs: " + string(cfg.LLMs))
 	}
