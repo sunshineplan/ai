@@ -144,7 +144,8 @@ func (prompt *Prompt) Execute(ai ai.AI, input []string, prefix string) (<-chan *
 	return c, n, nil
 }
 
-func (prompt *Prompt) JobList(ai ai.AI, input []string, prefix string, c chan<- *Result) (*workers.JobList[*Result], int, error) {
+func (prompt *Prompt) JobList(ctx context.Context, ai ai.AI, input []string, prefix string, c chan<- *Result) (
+	*workers.JobList[*Result], int, error) {
 	prompts, err := prompt.Prompts(input, prefix)
 	if err != nil {
 		return nil, 0, err
@@ -160,6 +161,7 @@ func (prompt *Prompt) JobList(ai ai.AI, input []string, prefix string, c chan<- 
 		}
 		c <- r
 	})
+	jobList.Start(ctx)
 	for i, p := range prompts {
 		jobList.PushBack(&Result{Index: i, Prompt: p})
 	}
