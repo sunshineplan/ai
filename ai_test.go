@@ -95,6 +95,7 @@ func TestGemini(t *testing.T) {
 		return
 	}
 	gemini, err := gemini.New(
+		context.Background(),
 		ai.WithAPIKey(apiKey),
 		ai.WithEndpoint(os.Getenv("GEMINI_ENDPOINT")),
 		ai.WithProxy(os.Getenv("GEMINI_PROXY")),
