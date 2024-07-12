@@ -1,7 +1,5 @@
 package ai
 
-import "golang.org/x/time/rate"
-
 type ClientConfig struct {
 	LLMs LLMs
 
@@ -9,7 +7,7 @@ type ClientConfig struct {
 	Endpoint string
 	Proxy    string
 
-	Limit *rate.Limit
+	Limit *int64
 
 	Model       string
 	ModelConfig ModelConfig
@@ -48,7 +46,7 @@ type ClientOption interface {
 func WithAPIKey(apiKey string) ClientOption           { return withAPIKey(apiKey) }
 func WithEndpoint(endpoint string) ClientOption       { return withEndpoint(endpoint) }
 func WithProxy(proxy string) ClientOption             { return withProxy(proxy) }
-func WithLimit(limit rate.Limit) ClientOption         { return withLimit(limit) }
+func WithLimit(rpm int64) ClientOption                { return withLimit(rpm) }
 func WithModel(model string) ClientOption             { return withModel(model) }
 func WithModelConfig(config ModelConfig) ClientOption { return withModelConfig(config) }
 
@@ -64,9 +62,9 @@ type withProxy string
 
 func (w withProxy) Apply(cfg *ClientConfig) { cfg.Proxy = string(w) }
 
-type withLimit rate.Limit
+type withLimit int64
 
-func (w withLimit) Apply(cfg *ClientConfig) { cfg.Limit = (*rate.Limit)(&w) }
+func (w withLimit) Apply(cfg *ClientConfig) { cfg.Limit = (*int64)(&w) }
 
 type withModel string
 

@@ -3,8 +3,10 @@ package chatgpt
 import (
 	"context"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/sunshineplan/ai"
 
@@ -74,8 +76,15 @@ func (chatgpt *ChatGPT) Model(_ context.Context) (string, error) {
 	return chatgpt.model, nil
 }
 
-func (chatgpt *ChatGPT) SetLimit(limit rate.Limit) {
-	chatgpt.limiter = ai.NewLimiter(limit)
+func (chatgpt *ChatGPT) SetLimit(rpm int64) {
+	chatgpt.limiter = ai.NewLimiter(rpm)
+}
+
+func (chatgpt *ChatGPT) Limit() (rpm int64) {
+	if chatgpt.limiter == nil {
+		return math.MaxInt64
+	}
+	return int64(chatgpt.limiter.Limit() / rate.Every(time.Minute))
 }
 
 func (ai *ChatGPT) wait(ctx context.Context) error {
