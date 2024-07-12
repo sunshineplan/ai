@@ -154,9 +154,11 @@ func (prompt *Prompt) JobList(ctx context.Context, ai ai.AI, input []string, pre
 		resp, err := chat(ai, prompt.d, r.Prompt)
 		if err != nil {
 			r.Result = nil
+			r.Tokens = 0
 			r.Error = err
 		} else {
 			r.Result = resp.Results()
+			r.Tokens = resp.TokenCount().Total
 			r.Error = nil
 		}
 		c <- r
