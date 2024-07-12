@@ -3,6 +3,7 @@ package prompt
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 	"text/template"
 	"time"
@@ -11,10 +12,7 @@ import (
 	"github.com/sunshineplan/workers"
 )
 
-const (
-	defaultTimeout = 5 * time.Minute
-	defaultWorkers = 3
-)
+const defaultTimeout = 3 * time.Minute
 
 const defaultTemplate = `{{.Request}}{{if .Example}}
 ###
@@ -49,12 +47,11 @@ type Prompt struct {
 	ex     *Example
 	n      int
 
-	d       time.Duration
-	workers int64
+	d time.Duration
 }
 
 func New(prompt string) *Prompt {
-	p := &Prompt{prompt: prompt, d: defaultTimeout, workers: defaultWorkers}
+	p := &Prompt{prompt: prompt, d: defaultTimeout}
 	p.t = template.Must(template.New("prompt").Funcs(defaultFuncMap).Parse(defaultTemplate))
 	return p
 }
@@ -76,11 +73,6 @@ func (prompt *Prompt) SetInputN(n int) *Prompt {
 
 func (prompt *Prompt) SetAITimeout(d time.Duration) *Prompt {
 	prompt.d = d
-	return prompt
-}
-
-func (prompt *Prompt) SetWorkers(n int64) *Prompt {
-	prompt.workers = n
 	return prompt
 }
 
@@ -123,6 +115,13 @@ type Result struct {
 	Error  error
 }
 
+func newWorkers(ai ai.AI) *workers.Workers {
+	if rpm := ai.Limit(); rpm != math.MaxInt64 {
+		return workers.NewWorkers(rpm)
+	}
+	return workers.NewWorkers(0)
+}
+
 func (prompt *Prompt) Execute(ai ai.AI, input []string, prefix string) (<-chan *Result, int, error) {
 	prompts, err := prompt.Prompts(input, prefix)
 	if err != nil {
@@ -131,7 +130,7 @@ func (prompt *Prompt) Execute(ai ai.AI, input []string, prefix string) (<-chan *
 	n := len(prompts)
 	c := make(chan *Result, n)
 	go func() {
-		workers.NewWorkers(prompt.workers).Run(context.Background(), workers.SliceJob(prompts, func(i int, p string) {
+		newWorkers(ai).Run(context.Background(), workers.SliceJob(prompts, func(i int, p string) {
 			resp, err := chat(ai, prompt.d, p)
 			if err != nil {
 				c <- &Result{i, p, nil, 0, err}
@@ -150,7 +149,7 @@ func (prompt *Prompt) JobList(ctx context.Context, ai ai.AI, input []string, pre
 	if err != nil {
 		return nil, 0, err
 	}
-	jobList := workers.NewJobList(workers.NewWorkers(prompt.workers), func(r *Result) {
+	jobList := workers.NewJobList(newWorkers(ai), func(r *Result) {
 		resp, err := chat(ai, prompt.d, r.Prompt)
 		if err != nil {
 			r.Result = nil

@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/sunshineplan/ai"
 
@@ -81,8 +83,15 @@ func (gemini *Gemini) Model(ctx context.Context) (string, error) {
 	return info.Name, nil
 }
 
-func (gemini *Gemini) SetLimit(limit rate.Limit) {
-	gemini.limiter = ai.NewLimiter(limit)
+func (gemini *Gemini) SetLimit(rpm int64) {
+	gemini.limiter = ai.NewLimiter(rpm)
+}
+
+func (gemini *Gemini) Limit() (rpm int64) {
+	if gemini.limiter == nil {
+		return math.MaxInt64
+	}
+	return int64(gemini.limiter.Limit() / rate.Every(time.Minute))
 }
 
 func (ai *Gemini) wait(ctx context.Context) error {
