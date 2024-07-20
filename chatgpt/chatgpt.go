@@ -14,7 +14,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-const defaultModel = openai.GPT3Dot5Turbo
+const defaultModel = openai.GPT4oMini
 
 var _ ai.AI = new(ChatGPT)
 
