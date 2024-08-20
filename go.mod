@@ -1,10 +1,10 @@
 module github.com/sunshineplan/ai
 
-go 1.22
+go 1.23
 
 require (
 	github.com/google/generative-ai-go v0.17.0
-	github.com/sashabaranov/go-openai v1.28.2
+	github.com/openai/openai-go v0.1.0-alpha.9
 	github.com/sunshineplan/workers v1.0.1
 	golang.org/x/time v0.6.0
 	google.golang.org/api v0.192.0
@@ -26,6 +26,10 @@ require (
 	github.com/googleapis/enterprise-certificate-proxy v0.3.2 // indirect
 	github.com/googleapis/gax-go/v2 v2.13.0 // indirect
 	github.com/sunshineplan/utils v0.1.71 // indirect
+	github.com/tidwall/gjson v1.14.4 // indirect
+	github.com/tidwall/match v1.1.1 // indirect
+	github.com/tidwall/pretty v1.2.1 // indirect
+	github.com/tidwall/sjson v1.2.5 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.51.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.51.0 // indirect

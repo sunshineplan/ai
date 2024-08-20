@@ -111,7 +111,7 @@ type Result struct {
 	Index  int
 	Prompt string
 	Result []string
-	Tokens int
+	Tokens int64
 	Error  error
 }
 

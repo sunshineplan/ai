@@ -106,10 +106,10 @@ func (ai *Gemini) SetModel(model string) {
 	ai.model.GenerationConfig = ai.config
 }
 
-func (ai *Gemini) SetCount(i int32)         { ai.config.SetCandidateCount(i) }
-func (ai *Gemini) SetMaxTokens(i int32)     { ai.config.SetMaxOutputTokens(i) }
-func (ai *Gemini) SetTemperature(f float32) { ai.config.SetTemperature(f) }
-func (ai *Gemini) SetTopP(f float32)        { ai.config.SetTopP(f) }
+func (ai *Gemini) SetCount(i int64)         { ai.config.SetCandidateCount(int32(i)) }
+func (ai *Gemini) SetMaxTokens(i int64)     { ai.config.SetMaxOutputTokens(int32(i)) }
+func (ai *Gemini) SetTemperature(f float64) { ai.config.SetTemperature(float32(f)) }
+func (ai *Gemini) SetTopP(f float64)        { ai.config.SetTopP(float32(f)) }
 func (ai *Gemini) SetJSONResponse(b bool) {
 	if b {
 		ai.config.ResponseMIMEType = "application/json"
@@ -151,9 +151,9 @@ func (resp *ChatResponse) Results() (res []string) {
 
 func (resp *ChatResponse) TokenCount() (res ai.TokenCount) {
 	if usage := resp.UsageMetadata; usage != nil {
-		res.Prompt = int(usage.PromptTokenCount)
-		res.Result = int(usage.CandidatesTokenCount)
-		res.Total = int(usage.TotalTokenCount)
+		res.Prompt = int64(usage.PromptTokenCount)
+		res.Result = int64(usage.CandidatesTokenCount)
+		res.Total = int64(usage.TotalTokenCount)
 	}
 	return
 }
