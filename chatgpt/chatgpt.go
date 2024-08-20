@@ -10,21 +10,23 @@ import (
 
 	"github.com/sunshineplan/ai"
 
-	"github.com/sashabaranov/go-openai"
+	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/option"
+	"github.com/openai/openai-go/packages/ssestream"
 	"golang.org/x/time/rate"
 )
 
-const defaultModel = openai.GPT4oMini
+const defaultModel = openai.ChatModelGPT4oMini
 
 var _ ai.AI = new(ChatGPT)
 
 type ChatGPT struct {
 	*openai.Client
 	model       string
-	maxTokens   *int32
-	temperature *float32
-	topP        *float32
-	count       *int32
+	maxTokens   *int64
+	temperature *float64
+	topP        *float64
+	count       *int64
 	json        *bool
 
 	limiter *rate.Limiter
@@ -35,9 +37,11 @@ func New(opts ...ai.ClientOption) (ai.AI, error) {
 	for _, i := range opts {
 		i.Apply(cfg)
 	}
-	config := openai.DefaultConfig(cfg.APIKey)
+	options := []option.RequestOption{
+		option.WithAPIKey(cfg.APIKey),
+	}
 	if cfg.Endpoint != "" {
-		config.BaseURL = cfg.Endpoint
+		options = append(options, option.WithBaseURL(cfg.Endpoint))
 	}
 	if cfg.Proxy != "" {
 		u, err := url.Parse(cfg.Proxy)
@@ -47,10 +51,10 @@ func New(opts ...ai.ClientOption) (ai.AI, error) {
 		if t, ok := http.DefaultTransport.(*http.Transport); ok {
 			t = t.Clone()
 			t.Proxy = http.ProxyURL(u)
-			config.HTTPClient = &http.Client{Transport: t}
+			options = append(options, option.WithHTTPClient(&http.Client{Transport: t}))
 		}
 	}
-	c := NewWithClient(openai.NewClientWithConfig(config), cfg.Model)
+	c := NewWithClient(openai.NewClient(options...), cfg.Model)
 	if cfg.Limit != nil {
 		c.SetLimit(*cfg.Limit)
 	}
@@ -95,29 +99,29 @@ func (ai *ChatGPT) wait(ctx context.Context) error {
 }
 
 func (ai *ChatGPT) SetModel(model string)    { ai.model = model }
-func (ai *ChatGPT) SetCount(i int32)         { ai.count = &i }
-func (ai *ChatGPT) SetMaxTokens(i int32)     { ai.maxTokens = &i }
-func (ai *ChatGPT) SetTemperature(f float32) { ai.temperature = &f }
-func (ai *ChatGPT) SetTopP(f float32)        { ai.topP = &f }
+func (ai *ChatGPT) SetCount(i int64)         { ai.count = &i }
+func (ai *ChatGPT) SetMaxTokens(i int64)     { ai.maxTokens = &i }
+func (ai *ChatGPT) SetTemperature(f float64) { ai.temperature = &f }
+func (ai *ChatGPT) SetTopP(f float64)        { ai.topP = &f }
 func (ai *ChatGPT) SetJSONResponse(b bool)   { ai.json = &b }
 
-type ChatGPTResponse interface {
-	openai.ChatCompletionResponse | openai.ChatCompletionStreamResponse
+var _ ai.ChatResponse = new(ChatResponse[*openai.ChatCompletion])
+
+type ChatCompletionResponse interface {
+	*openai.ChatCompletion | openai.ChatCompletionChunk
 }
 
-var _ ai.ChatResponse = new(ChatResponse[openai.ChatCompletionResponse])
-
-type ChatResponse[Response ChatGPTResponse] struct {
+type ChatResponse[Response ChatCompletionResponse] struct {
 	resp Response
 }
 
 func (resp *ChatResponse[Response]) Results() (res []string) {
 	switch v := any(resp.resp).(type) {
-	case openai.ChatCompletionResponse:
+	case *openai.ChatCompletion:
 		for _, i := range v.Choices {
 			res = append(res, i.Message.Content)
 		}
-	case openai.ChatCompletionStreamResponse:
+	case openai.ChatCompletionChunk:
 		for _, i := range v.Choices {
 			res = append(res, i.Delta.Content)
 		}
@@ -127,16 +131,14 @@ func (resp *ChatResponse[Response]) Results() (res []string) {
 
 func (resp *ChatResponse[Response]) TokenCount() (res ai.TokenCount) {
 	switch v := any(resp.resp).(type) {
-	case openai.ChatCompletionResponse:
+	case *openai.ChatCompletion:
 		res.Prompt = v.Usage.PromptTokens
 		res.Result = v.Usage.CompletionTokens
 		res.Total = v.Usage.TotalTokens
-	case openai.ChatCompletionStreamResponse:
-		if usage := v.Usage; usage != nil {
-			res.Prompt = usage.PromptTokens
-			res.Result = usage.CompletionTokens
-			res.Total = usage.TotalTokens
-		}
+	case openai.ChatCompletionChunk:
+		res.Prompt = v.Usage.PromptTokens
+		res.Result = v.Usage.CompletionTokens
+		res.Total = v.Usage.TotalTokens
 	}
 	return
 }
@@ -152,32 +154,35 @@ func (ai *ChatGPT) createRequest(
 	one bool,
 	history []openai.ChatCompletionMessage,
 	messages ...string,
-) (req openai.ChatCompletionRequest) {
-	req.Model = ai.model
+) (req openai.ChatCompletionNewParams) {
+	req.Model = openai.String(ai.model)
 	if ai.maxTokens != nil {
-		req.MaxTokens = int(*ai.maxTokens)
+		req.MaxTokens = openai.Int(*ai.maxTokens)
 	}
 	if !one && ai.count != nil {
-		req.N = int(*ai.count)
+		req.N = openai.Int(*ai.count)
 	}
 	if ai.temperature != nil {
-		req.Temperature = *ai.temperature
+		req.Temperature = openai.Float(*ai.temperature)
 	}
 	if ai.topP != nil {
-		req.TopP = *ai.topP
+		req.TopP = openai.Float(*ai.topP)
 	}
 	if ai.json != nil && *ai.json {
-		req.ResponseFormat = &openai.ChatCompletionResponseFormat{
-			Type: openai.ChatCompletionResponseFormatTypeJSONObject,
-		}
-	}
-	req.Messages = history
-	for _, i := range messages {
-		req.Messages = append(
-			req.Messages,
-			openai.ChatCompletionMessage{Role: openai.ChatMessageRoleUser, Content: i},
+		req.ResponseFormat = openai.F[openai.ChatCompletionNewParamsResponseFormatUnion](
+			openai.ChatCompletionNewParamsResponseFormat{
+				Type: openai.F(openai.ChatCompletionNewParamsResponseFormatTypeJSONObject),
+			},
 		)
 	}
+	var msgs []openai.ChatCompletionMessageParamUnion
+	for _, i := range history {
+		msgs = append(msgs, i)
+	}
+	for _, i := range messages {
+		msgs = append(msgs, openai.ChatCompletionMessage{Content: i, Role: "user"})
+	}
+	req.Messages = openai.F(msgs)
 	return
 }
 
@@ -186,7 +191,7 @@ func (chatgpt *ChatGPT) chat(
 	session bool,
 	history []openai.ChatCompletionMessage,
 	messages ...string,
-) (resp openai.ChatCompletionResponse, err error) {
+) (resp *openai.ChatCompletion, err error) {
 	if chatgpt.Client == nil {
 		err = ai.ErrAIClosed
 		return
@@ -194,7 +199,7 @@ func (chatgpt *ChatGPT) chat(
 	if err = chatgpt.wait(ctx); err != nil {
 		return
 	}
-	return chatgpt.CreateChatCompletion(ctx, chatgpt.createRequest(session, history, messages...))
+	return chatgpt.Client.Chat.Completions.New(ctx, chatgpt.createRequest(session, history, messages...))
 }
 
 func (ai *ChatGPT) Chat(ctx context.Context, messages ...string) (ai.ChatResponse, error) {
@@ -202,53 +207,54 @@ func (ai *ChatGPT) Chat(ctx context.Context, messages ...string) (ai.ChatRespons
 	if err != nil {
 		return nil, err
 	}
-	return &ChatResponse[openai.ChatCompletionResponse]{resp}, nil
+	return &ChatResponse[*openai.ChatCompletion]{resp}, nil
 }
 
 var _ ai.ChatStream = new(ChatStream)
 
 type ChatStream struct {
-	sr     *openai.ChatCompletionStream
-	cs     *ChatSession
-	merged string
+	stream  *ssestream.Stream[openai.ChatCompletionChunk]
+	session *ChatSession
+	merged  string
 }
 
-func (stream *ChatStream) Next() (ai.ChatResponse, error) {
-	resp, err := stream.sr.Recv()
-	if err != nil {
-		if err == io.EOF {
-			if stream.cs != nil {
-				stream.cs.history = append(stream.cs.history, openai.ChatCompletionMessage{
-					Role: openai.ChatMessageRoleAssistant, Content: stream.merged})
-			}
+func (cs *ChatStream) Next() (ai.ChatResponse, error) {
+	if cs.stream.Next() {
+		resp := cs.stream.Current()
+		if cs.session != nil && len(resp.Choices) > 0 {
+			cs.merged += resp.Choices[0].Delta.Content
 		}
-		stream.merged = ""
+		return &ChatResponse[openai.ChatCompletionChunk]{resp}, nil
+	}
+	if err := cs.stream.Err(); err != nil {
+		cs.merged = ""
 		return nil, err
 	}
-	if stream.cs != nil && len(resp.Choices) > 0 {
-		stream.merged += resp.Choices[0].Delta.Content
+	if cs.session != nil {
+		cs.session.history = append(cs.session.history, openai.ChatCompletionMessage{
+			Content: cs.merged,
+			Role:    openai.ChatCompletionMessageRoleAssistant,
+		})
 	}
-	return &ChatResponse[openai.ChatCompletionStreamResponse]{resp}, nil
+	return nil, io.EOF
 }
 
-func (stream *ChatStream) Close() error {
-	return stream.sr.Close()
+func (cs *ChatStream) Close() error {
+	return cs.stream.Close()
 }
 
 func (chatgpt *ChatGPT) chatStream(
 	ctx context.Context,
 	history []openai.ChatCompletionMessage,
 	messages ...string,
-) (*openai.ChatCompletionStream, error) {
+) (*ssestream.Stream[openai.ChatCompletionChunk], error) {
 	if chatgpt.Client == nil {
 		return nil, ai.ErrAIClosed
 	}
 	if err := chatgpt.wait(ctx); err != nil {
 		return nil, err
 	}
-	req := chatgpt.createRequest(true, history, messages...)
-	req.Stream = true
-	return chatgpt.CreateChatCompletionStream(ctx, req)
+	return chatgpt.Client.Chat.Completions.NewStreaming(ctx, chatgpt.createRequest(true, history, messages...)), nil
 }
 
 func (ai *ChatGPT) ChatStream(ctx context.Context, messages ...string) (ai.ChatStream, error) {
@@ -266,12 +272,9 @@ type ChatSession struct {
 	history []openai.ChatCompletionMessage
 }
 
-func addToHistory(history *[]openai.ChatCompletionMessage, role string, messages ...string) {
+func (session *ChatSession) addUserHistory(messages ...string) {
 	for _, i := range messages {
-		*history = append(
-			*history,
-			openai.ChatCompletionMessage{Role: role, Content: i},
-		)
+		session.history = append(session.history, openai.ChatCompletionMessage{Content: i, Role: "user"})
 	}
 }
 
@@ -280,11 +283,11 @@ func (session *ChatSession) Chat(ctx context.Context, messages ...string) (ai.Ch
 	if err != nil {
 		return nil, err
 	}
-	addToHistory(&session.history, openai.ChatMessageRoleUser, messages...)
+	session.addUserHistory(messages...)
 	if len(resp.Choices) > 0 {
 		session.history = append(session.history, resp.Choices[0].Message)
 	}
-	return &ChatResponse[openai.ChatCompletionResponse]{resp}, nil
+	return &ChatResponse[*openai.ChatCompletion]{resp}, nil
 }
 
 func (session *ChatSession) ChatStream(ctx context.Context, messages ...string) (ai.ChatStream, error) {
@@ -292,13 +295,13 @@ func (session *ChatSession) ChatStream(ctx context.Context, messages ...string) 
 	if err != nil {
 		return nil, err
 	}
-	addToHistory(&session.history, openai.ChatMessageRoleUser, messages...)
+	session.addUserHistory(messages...)
 	return &ChatStream{stream, session, ""}, nil
 }
 
 func (session *ChatSession) History() (history []ai.Message) {
 	for _, i := range session.history {
-		history = append(history, ai.Message{Content: i.Content, Role: i.Role})
+		history = append(history, ai.Message{Content: i.Content, Role: string(i.Role)})
 	}
 	return
 }

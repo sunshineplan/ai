@@ -23,10 +23,10 @@ type AI interface {
 }
 
 type Model interface {
-	SetCount(x int32)
-	SetMaxTokens(x int32)
-	SetTemperature(x float32)
-	SetTopP(x float32)
+	SetCount(x int64)
+	SetMaxTokens(x int64)
+	SetTemperature(x float64)
+	SetTopP(x float64)
 	SetJSONResponse(b bool)
 }
 
@@ -51,9 +51,9 @@ type ChatStream interface {
 }
 
 type TokenCount struct {
-	Prompt int
-	Result int
-	Total  int
+	Prompt int64
+	Result int64
+	Total  int64
 }
 
 type ChatResponse interface {

@@ -14,10 +14,10 @@ type ClientConfig struct {
 }
 
 type ModelConfig struct {
-	Count        *int32
-	MaxTokens    *int32
-	Temperature  *float32
-	TopP         *float32
+	Count        *int64
+	MaxTokens    *int64
+	Temperature  *float64
+	TopP         *float64
 	JSONResponse *bool
 }
 
