@@ -6,7 +6,7 @@ require (
 	github.com/google/generative-ai-go v0.18.0
 	github.com/openai/openai-go v0.1.0-alpha.25
 	github.com/sunshineplan/workers v1.0.1
-	golang.org/x/time v0.6.0
+	golang.org/x/time v0.7.0
 	google.golang.org/api v0.199.0
 )
 
