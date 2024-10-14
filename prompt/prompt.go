@@ -169,7 +169,7 @@ func (prompt *Prompt) JobList(ctx context.Context, ai ai.AI, input []string, pre
 	return jobList, len(prompts), nil
 }
 
-func chat(ai ai.AI, d time.Duration, p string) (ai.ChatResponse, error) {
+func chat(c ai.AI, d time.Duration, p string) (ai.ChatResponse, error) {
 	var ctx context.Context
 	var cancel context.CancelFunc
 	if d > 0 {
@@ -178,5 +178,5 @@ func chat(ai ai.AI, d time.Duration, p string) (ai.ChatResponse, error) {
 		ctx, cancel = context.WithCancel(context.Background())
 	}
 	defer cancel()
-	return ai.Chat(ctx, p)
+	return c.Chat(ctx, ai.Text(p))
 }

@@ -118,17 +118,25 @@ func (ai *Gemini) SetJSONResponse(b bool) {
 	}
 }
 
-func texts2parts(texts []string) (parts []genai.Part) {
-	for _, i := range texts {
-		parts = append(parts, genai.Text(i))
+func toParts(src []ai.Part) (dst []genai.Part) {
+	for _, i := range src {
+		switch v := i.(type) {
+		case ai.Text:
+			dst = append(dst, genai.Text(v))
+		case ai.Image:
+			dst = append(dst, genai.Blob(v))
+		}
 	}
 	return
 }
 
-func parts2texts(parts []genai.Part) (texts []string) {
-	for _, i := range parts {
-		if text, ok := i.(genai.Text); ok {
-			texts = append(texts, string(text))
+func fromParts(src []genai.Part) (dst []ai.Part) {
+	for _, i := range src {
+		switch v := i.(type) {
+		case genai.Text:
+			dst = append(dst, ai.Text(v))
+		case genai.Blob:
+			dst = append(dst, ai.Image(v))
 		}
 	}
 	return
@@ -143,7 +151,13 @@ type ChatResponse struct {
 func (resp *ChatResponse) Results() (res []string) {
 	for _, i := range resp.Candidates {
 		if i.Content != nil {
-			res = append(res, strings.Join(parts2texts(i.Content.Parts), "\n"))
+			var s []string
+			for _, i := range i.Content.Parts {
+				if v, ok := i.(genai.Text); ok {
+					s = append(s, string(v))
+				}
+			}
+			res = append(res, strings.Join(s, "\n"))
 		}
 	}
 	return
@@ -165,11 +179,11 @@ func (resp *ChatResponse) String() string {
 	return ""
 }
 
-func (ai *Gemini) Chat(ctx context.Context, parts ...string) (ai.ChatResponse, error) {
+func (ai *Gemini) Chat(ctx context.Context, parts ...ai.Part) (ai.ChatResponse, error) {
 	if err := ai.wait(ctx); err != nil {
 		return nil, err
 	}
-	resp, err := ai.model.GenerateContent(ctx, texts2parts(parts)...)
+	resp, err := ai.model.GenerateContent(ctx, toParts(parts)...)
 	if err != nil {
 		return nil, err
 	}
@@ -201,11 +215,11 @@ func (stream *ChatStream) Close() error {
 	return nil
 }
 
-func (ai *Gemini) ChatStream(ctx context.Context, parts ...string) (ai.ChatStream, error) {
+func (ai *Gemini) ChatStream(ctx context.Context, parts ...ai.Part) (ai.ChatStream, error) {
 	if err := ai.wait(ctx); err != nil {
 		return nil, err
 	}
-	return &ChatStream{ai.model.GenerateContentStream(ctx, texts2parts(parts)...)}, nil
+	return &ChatStream{ai.model.GenerateContentStream(ctx, toParts(parts)...)}, nil
 }
 
 var _ ai.ChatSession = new(ChatSession)
@@ -215,27 +229,27 @@ type ChatSession struct {
 	cs *genai.ChatSession
 }
 
-func (session *ChatSession) Chat(ctx context.Context, parts ...string) (ai.ChatResponse, error) {
+func (session *ChatSession) Chat(ctx context.Context, parts ...ai.Part) (ai.ChatResponse, error) {
 	if err := session.ai.wait(ctx); err != nil {
 		return nil, err
 	}
-	resp, err := session.cs.SendMessage(ctx, texts2parts(parts)...)
+	resp, err := session.cs.SendMessage(ctx, toParts(parts)...)
 	if err != nil {
 		return nil, err
 	}
 	return &ChatResponse{resp}, nil
 }
 
-func (session *ChatSession) ChatStream(ctx context.Context, parts ...string) (ai.ChatStream, error) {
+func (session *ChatSession) ChatStream(ctx context.Context, parts ...ai.Part) (ai.ChatStream, error) {
 	if err := session.ai.wait(ctx); err != nil {
 		return nil, err
 	}
-	return &ChatStream{session.cs.SendMessageStream(ctx, texts2parts(parts)...)}, nil
+	return &ChatStream{session.cs.SendMessageStream(ctx, toParts(parts)...)}, nil
 }
 
-func (session *ChatSession) History() (history []ai.Message) {
+func (session *ChatSession) History() (history []ai.Content) {
 	for _, i := range session.cs.History {
-		history = append(history, ai.Message{Content: strings.Join(parts2texts(i.Parts), "\n"), Role: i.Role})
+		history = append(history, ai.Content{Parts: fromParts(i.Parts), Role: i.Role})
 	}
 	return
 }

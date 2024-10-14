@@ -31,18 +31,13 @@ type Model interface {
 }
 
 type Chatbot interface {
-	Chat(context.Context, ...string) (ChatResponse, error)
-	ChatStream(context.Context, ...string) (ChatStream, error)
-}
-
-type Message struct {
-	Content string
-	Role    string
+	Chat(context.Context, ...Part) (ChatResponse, error)
+	ChatStream(context.Context, ...Part) (ChatStream, error)
 }
 
 type ChatSession interface {
 	Chatbot
-	History() []Message
+	History() []Content
 }
 
 type ChatStream interface {
