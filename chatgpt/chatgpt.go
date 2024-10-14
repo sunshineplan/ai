@@ -2,10 +2,13 @@ package chatgpt
 
 import (
 	"context"
+	"encoding/base64"
+	"fmt"
 	"io"
 	"math"
 	"net/http"
 	"net/url"
+	"regexp"
 	"time"
 
 	"github.com/sunshineplan/ai"
@@ -150,25 +153,38 @@ func (resp *ChatResponse[Response]) String() string {
 	return ""
 }
 
-func (ai *ChatGPT) createRequest(
+func toImagePart(img ai.Image) openai.ChatCompletionContentPartImageParam {
+	return openai.ImagePart(fmt.Sprintf("data:%s;base64,%s", img.MIMEType, base64.StdEncoding.EncodeToString(img.Data)))
+}
+
+func fromImagePart(img openai.ChatCompletionContentPartImageParam) ai.Image {
+	res := regexp.MustCompile("^data:(.+);base64,(.+)$").FindStringSubmatch(img.ImageURL.Value.URL.Value)
+	b, err := base64.StdEncoding.DecodeString(res[1])
+	if err != nil {
+		panic(err)
+	}
+	return ai.ImageData(res[0], b)
+}
+
+func (c *ChatGPT) createRequest(
 	one bool,
-	history []openai.ChatCompletionMessage,
-	messages ...string,
+	history []openai.ChatCompletionMessageParamUnion,
+	messages ...ai.Part,
 ) (req openai.ChatCompletionNewParams) {
-	req.Model = openai.String(ai.model)
-	if ai.maxTokens != nil {
-		req.MaxTokens = openai.Int(*ai.maxTokens)
+	req.Model = openai.String(c.model)
+	if c.maxTokens != nil {
+		req.MaxTokens = openai.Int(*c.maxTokens)
 	}
-	if !one && ai.count != nil {
-		req.N = openai.Int(*ai.count)
+	if !one && c.count != nil {
+		req.N = openai.Int(*c.count)
 	}
-	if ai.temperature != nil {
-		req.Temperature = openai.Float(*ai.temperature)
+	if c.temperature != nil {
+		req.Temperature = openai.Float(*c.temperature)
 	}
-	if ai.topP != nil {
-		req.TopP = openai.Float(*ai.topP)
+	if c.topP != nil {
+		req.TopP = openai.Float(*c.topP)
 	}
-	if ai.json != nil && *ai.json {
+	if c.json != nil && *c.json {
 		req.ResponseFormat = openai.F[openai.ChatCompletionNewParamsResponseFormatUnion](
 			openai.ChatCompletionNewParamsResponseFormat{
 				Type: openai.F(openai.ChatCompletionNewParamsResponseFormatTypeJSONObject),
@@ -176,11 +192,14 @@ func (ai *ChatGPT) createRequest(
 		)
 	}
 	var msgs []openai.ChatCompletionMessageParamUnion
-	for _, i := range history {
-		msgs = append(msgs, i)
-	}
+	msgs = append(msgs, history...)
 	for _, i := range messages {
-		msgs = append(msgs, openai.ChatCompletionMessage{Content: i, Role: "user"})
+		switch v := i.(type) {
+		case ai.Text:
+			msgs = append(msgs, openai.UserMessage(string(v)))
+		case ai.Image:
+			msgs = append(msgs, openai.UserMessageParts(toImagePart((v))))
+		}
 	}
 	req.Messages = openai.F(msgs)
 	return
@@ -189,8 +208,8 @@ func (ai *ChatGPT) createRequest(
 func (chatgpt *ChatGPT) chat(
 	ctx context.Context,
 	session bool,
-	history []openai.ChatCompletionMessage,
-	messages ...string,
+	history []openai.ChatCompletionMessageParamUnion,
+	messages ...ai.Part,
 ) (resp *openai.ChatCompletion, err error) {
 	if chatgpt.Client == nil {
 		err = ai.ErrAIClosed
@@ -202,7 +221,7 @@ func (chatgpt *ChatGPT) chat(
 	return chatgpt.Client.Chat.Completions.New(ctx, chatgpt.createRequest(session, history, messages...))
 }
 
-func (ai *ChatGPT) Chat(ctx context.Context, messages ...string) (ai.ChatResponse, error) {
+func (ai *ChatGPT) Chat(ctx context.Context, messages ...ai.Part) (ai.ChatResponse, error) {
 	resp, err := ai.chat(ctx, false, nil, messages...)
 	if err != nil {
 		return nil, err
@@ -245,8 +264,8 @@ func (cs *ChatStream) Close() error {
 
 func (chatgpt *ChatGPT) chatStream(
 	ctx context.Context,
-	history []openai.ChatCompletionMessage,
-	messages ...string,
+	history []openai.ChatCompletionMessageParamUnion,
+	messages ...ai.Part,
 ) (*ssestream.Stream[openai.ChatCompletionChunk], error) {
 	if chatgpt.Client == nil {
 		return nil, ai.ErrAIClosed
@@ -257,7 +276,7 @@ func (chatgpt *ChatGPT) chatStream(
 	return chatgpt.Client.Chat.Completions.NewStreaming(ctx, chatgpt.createRequest(true, history, messages...)), nil
 }
 
-func (ai *ChatGPT) ChatStream(ctx context.Context, messages ...string) (ai.ChatStream, error) {
+func (ai *ChatGPT) ChatStream(ctx context.Context, messages ...ai.Part) (ai.ChatStream, error) {
 	stream, err := ai.chatStream(ctx, nil, messages...)
 	if err != nil {
 		return nil, err
@@ -269,16 +288,21 @@ var _ ai.ChatSession = new(ChatSession)
 
 type ChatSession struct {
 	ai      *ChatGPT
-	history []openai.ChatCompletionMessage
+	history []openai.ChatCompletionMessageParamUnion
 }
 
-func (session *ChatSession) addUserHistory(messages ...string) {
+func (session *ChatSession) addUserHistory(messages ...ai.Part) {
 	for _, i := range messages {
-		session.history = append(session.history, openai.ChatCompletionMessage{Content: i, Role: "user"})
+		switch v := i.(type) {
+		case ai.Text:
+			session.history = append(session.history, openai.UserMessage(string(v)))
+		case ai.Image:
+			session.history = append(session.history, openai.UserMessageParts(toImagePart(v)))
+		}
 	}
 }
 
-func (session *ChatSession) Chat(ctx context.Context, messages ...string) (ai.ChatResponse, error) {
+func (session *ChatSession) Chat(ctx context.Context, messages ...ai.Part) (ai.ChatResponse, error) {
 	resp, err := session.ai.chat(ctx, true, session.history, messages...)
 	if err != nil {
 		return nil, err
@@ -290,7 +314,7 @@ func (session *ChatSession) Chat(ctx context.Context, messages ...string) (ai.Ch
 	return &ChatResponse[*openai.ChatCompletion]{resp}, nil
 }
 
-func (session *ChatSession) ChatStream(ctx context.Context, messages ...string) (ai.ChatStream, error) {
+func (session *ChatSession) ChatStream(ctx context.Context, messages ...ai.Part) (ai.ChatStream, error) {
 	stream, err := session.ai.chatStream(ctx, session.history, messages...)
 	if err != nil {
 		return nil, err
@@ -299,9 +323,23 @@ func (session *ChatSession) ChatStream(ctx context.Context, messages ...string) 
 	return &ChatStream{stream, session, ""}, nil
 }
 
-func (session *ChatSession) History() (history []ai.Message) {
+func (session *ChatSession) History() (history []ai.Content) {
 	for _, i := range session.history {
-		history = append(history, ai.Message{Content: i.Content, Role: string(i.Role)})
+		switch v := i.(type) {
+		case openai.ChatCompletionMessage:
+			history = append(history, ai.Content{Role: string(v.Role), Parts: []ai.Part{ai.Text(v.Content)}})
+		case openai.ChatCompletionUserMessageParam:
+			var parts []ai.Part
+			for _, i := range v.Content.Value {
+				switch v := i.(type) {
+				case openai.ChatCompletionContentPartTextParam:
+					parts = append(parts, ai.Text(v.Text.Value))
+				case openai.ChatCompletionContentPartImageParam:
+					parts = append(parts, fromImagePart(v))
+				}
+			}
+			history = append(history, ai.Content{Role: "user", Parts: parts})
+		}
 	}
 	return
 }
