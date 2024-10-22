@@ -115,11 +115,12 @@ type Result struct {
 	Error  error
 }
 
-func newWorkers(ai ai.AI) *workers.Workers {
+func limit(ai ai.AI) int {
+	var limit int
 	if rpm := ai.Limit(); rpm != math.MaxInt64 {
-		return workers.NewWorkers(rpm)
+		return int(rpm)
 	}
-	return workers.NewWorkers(0)
+	return limit
 }
 
 func (prompt *Prompt) Execute(ai ai.AI, input []string, prefix string) (<-chan *Result, int, error) {
@@ -130,7 +131,7 @@ func (prompt *Prompt) Execute(ai ai.AI, input []string, prefix string) (<-chan *
 	n := len(prompts)
 	c := make(chan *Result, n)
 	go func() {
-		newWorkers(ai).Run(context.Background(), workers.SliceJob(prompts, func(i int, p string) {
+		workers.Workers(limit(ai)).Run(context.Background(), workers.SliceJob(prompts, func(i int, p string) {
 			resp, err := chat(ai, prompt.d, p)
 			if err != nil {
 				c <- &Result{i, p, nil, 0, err}
@@ -149,7 +150,7 @@ func (prompt *Prompt) JobList(ctx context.Context, ai ai.AI, input []string, pre
 	if err != nil {
 		return nil, 0, err
 	}
-	jobList := workers.NewJobList(newWorkers(ai), func(r *Result) {
+	jobList := workers.NewJobList(limit(ai), func(r *Result) {
 		resp, err := chat(ai, prompt.d, r.Prompt)
 		if err != nil {
 			r.Result = nil
