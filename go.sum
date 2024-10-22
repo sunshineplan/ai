@@ -77,10 +77,10 @@ github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO
 github.com/stretchr/testify v1.8.1/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o6fzry7u4=
 github.com/stretchr/testify v1.9.0 h1:HtqpIVDClZ4nwg75+f6Lvsy/wHu+3BoSGCbBAcpTsTg=
 github.com/stretchr/testify v1.9.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
-github.com/sunshineplan/utils v0.1.71 h1:FTe6qAdevePih+hLil1KvKhMAU2Bp+qHTtlO0wxoAYI=
-github.com/sunshineplan/utils v0.1.71/go.mod h1:QMe2vCEFq9VliPac8WfXndi5jP0ZrPHus8wvJlgBy5M=
-github.com/sunshineplan/workers v1.0.1 h1:vhDo4ZaerVu0QM1udRmWpvHY2U61/vTLRVwmKcYOxNw=
-github.com/sunshineplan/workers v1.0.1/go.mod h1:EjLgk5vd/2ig6vdWDAZy/fpkzdSm8IVDsARPQVSyQy0=
+github.com/sunshineplan/utils v0.1.73 h1:Kvi45QYzdvNqQKON5Q67M7U/35+RrOnX7K8sbZtHsgI=
+github.com/sunshineplan/utils v0.1.73/go.mod h1:61jHA9jn2CVlZzt9LbPz+MpOEiR6Jy5SNHHEcc/KQNk=
+github.com/sunshineplan/workers v1.0.3 h1:9NSB3nm9yxZFT/ZU4DaOXdWJ56Y2WXh238apdZUdA44=
+github.com/sunshineplan/workers v1.0.3/go.mod h1:wUlVWxvfwTiuULOw4atF17bgeL30gIMI6gE050reEVw=
 github.com/tidwall/gjson v1.14.2/go.mod h1:/wbyibRr2FHMks5tjHJ5F8dMZh3AcwJEMf5vlfC0lxk=
 github.com/tidwall/gjson v1.14.4 h1:uo0p8EbA09J7RQaflQ1aBRffTR7xedD2bcIVSYxLnkM=
 github.com/tidwall/gjson v1.14.4/go.mod h1:/wbyibRr2FHMks5tjHJ5F8dMZh3AcwJEMf5vlfC0lxk=
