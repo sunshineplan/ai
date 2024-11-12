@@ -4,7 +4,7 @@ go 1.23
 
 require (
 	github.com/google/generative-ai-go v0.18.0
-	github.com/openai/openai-go v0.1.0-alpha.35
+	github.com/openai/openai-go v0.1.0-alpha.37
 	github.com/sunshineplan/workers v1.0.4
 	golang.org/x/time v0.8.0
 	google.golang.org/api v0.205.0
