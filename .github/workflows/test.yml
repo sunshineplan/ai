@@ -50,4 +50,8 @@ jobs:
           GEMINI_PROXY: ${{ secrets.GEMINI_PROXY }}
           GEMINI_ENDPOINT: ${{ secrets.GEMINI_ENDPOINT }}
           GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_PROXY: ${{ secrets.ANTHROPIC_PROXY }}
+          ANTHROPIC_ENDPOINT: ${{ secrets.ANTHROPIC_ENDPOINT }}
+          ANTHROPIC_MODEL: ${{ secrets.ANTHROPIC_MODEL }}
         run: go test -v

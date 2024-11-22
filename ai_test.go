@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/sunshineplan/ai"
+	"github.com/sunshineplan/ai/anthropic"
 	"github.com/sunshineplan/ai/chatgpt"
 	"github.com/sunshineplan/ai/gemini"
 )
@@ -169,5 +170,49 @@ func TestChatGPT(t *testing.T) {
 	}
 	if err := testChatSession(chatgpt); err != nil {
 		t.Error(err)
+	}
+	img, err := os.ReadFile("testdata/personWorkingOnComputer.jpg")
+	if err == nil {
+		resp, err := chatgpt.Chat(context.Background(), ai.ImageData("image/jpeg", img), ai.Text("What is in this picture?"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		fmt.Println(resp.Results())
+		checkMatch(t, resp.Results()[0], "man|person", "computer|laptop")
+	}
+}
+
+func TestAnthropic(t *testing.T) {
+	apiKey := os.Getenv("ANTHROPIC_API_KEY")
+	if apiKey == "" {
+		return
+	}
+	anthropic, err := anthropic.New(
+		ai.WithAPIKey(apiKey),
+		ai.WithEndpoint(os.Getenv("ANTHROPIC_ENDPOINT")),
+		ai.WithProxy(os.Getenv("ANTHROPIC_PROXY")),
+		ai.WithModel(os.Getenv("ANTHROPIC_MODEL")),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer anthropic.Close()
+	if err := testChat(anthropic, "Who are you?"); err != nil {
+		t.Fatal(err)
+	}
+	if err := testChatStream(anthropic, "Who am I?"); err != nil {
+		t.Error(err)
+	}
+	if err := testChatSession(anthropic); err != nil {
+		t.Error(err)
+	}
+	img, err := os.ReadFile("testdata/personWorkingOnComputer.jpg")
+	if err == nil {
+		resp, err := anthropic.Chat(context.Background(), ai.ImageData("image/jpeg", img), ai.Text("What is in this picture?"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		fmt.Println(resp.Results())
+		checkMatch(t, resp.Results()[0], "man|person", "computer|laptop")
 	}
 }

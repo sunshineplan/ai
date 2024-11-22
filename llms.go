@@ -7,11 +7,12 @@ import (
 )
 
 const (
-	ChatGPT LLMs = "ChatGPT"
-	Gemini  LLMs = "Gemini"
+	ChatGPT   LLMs = "ChatGPT"
+	Gemini    LLMs = "Gemini"
+	Anthropic LLMs = "Anthropic"
 )
 
-var llms = []LLMs{ChatGPT, Gemini}
+var llms = []LLMs{ChatGPT, Gemini, Anthropic}
 
 var (
 	_ encoding.TextMarshaler   = LLMs("")
