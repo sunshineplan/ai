@@ -52,6 +52,7 @@ type TokenCount struct {
 }
 
 type ChatResponse interface {
+	Raw() any
 	Results() []string
 	TokenCount() TokenCount
 }

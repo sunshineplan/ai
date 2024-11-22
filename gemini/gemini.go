@@ -148,6 +148,10 @@ type ChatResponse struct {
 	*genai.GenerateContentResponse
 }
 
+func (resp *ChatResponse) Raw() any {
+	return resp.GenerateContentResponse
+}
+
 func (resp *ChatResponse) Results() (res []string) {
 	for _, i := range resp.Candidates {
 		if i.Content != nil {

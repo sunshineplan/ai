@@ -118,6 +118,10 @@ type ChatResponse[Response ChatCompletionResponse] struct {
 	resp Response
 }
 
+func (resp *ChatResponse[Response]) Raw() any {
+	return resp.resp
+}
+
 func (resp *ChatResponse[Response]) Results() (res []string) {
 	switch v := any(resp.resp).(type) {
 	case *openai.ChatCompletion:
