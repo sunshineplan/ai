@@ -11,7 +11,7 @@ type Part interface {
 
 type Text string
 
-func (t Text) implementsPart() {}
+func (Text) implementsPart() {}
 
 type Image struct {
 	MIMEType string
@@ -25,4 +25,19 @@ func ImageData(mime string, data []byte) Image {
 	}
 }
 
-func (t Image) implementsPart() {}
+func (Image) implementsPart() {}
+
+type FunctionCall struct {
+	ID        string
+	Name      string
+	Arguments string
+}
+
+func (FunctionCall) implementsPart() {}
+
+type FunctionResponse struct {
+	ID       string
+	Response string
+}
+
+func (FunctionResponse) implementsPart() {}
