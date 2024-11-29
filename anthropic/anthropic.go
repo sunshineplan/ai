@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/sunshineplan/ai"
@@ -222,6 +223,13 @@ func (resp *ChatResponse[Response]) String() string {
 	if res := resp.Results(); len(res) > 0 {
 		return res[0]
 	}
+	if res := resp.FunctionCalls(); len(res) > 0 {
+		var args []string
+		for _, i := range res {
+			args = append(args, i.Arguments)
+		}
+		return strings.Join(args, "\n")
+	}
 	return ""
 }
 
@@ -260,7 +268,15 @@ func (c *Anthropic) createRequest(
 		req.TopP = anthropic.Float(*c.topP)
 	}
 	var msgs []anthropic.MessageParam
-	msgs = append(msgs, history...)
+	for _, i := range history {
+		for _, v := range i.Content.Value {
+			switch v.(type) {
+			case anthropic.ToolUseBlockParam:
+				continue
+			}
+		}
+		msgs = append(msgs, i)
+	}
 	for _, i := range messages {
 		switch v := i.(type) {
 		case ai.Text:

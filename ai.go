@@ -31,7 +31,7 @@ type Function struct {
 type Schema struct {
 	Type       string         `json:"type"`
 	Properties map[string]any `json:"properties"`
-	Enum       []string       `json:"enum"`
+	Enum       []string       `json:"enum,omitempty"`
 	Required   []string       `json:"required"`
 }
 

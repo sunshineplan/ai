@@ -273,6 +273,13 @@ func (resp *ChatResponse) String() string {
 	if res := resp.Results(); len(res) > 0 {
 		return res[0]
 	}
+	if res := resp.FunctionCalls(); len(res) > 0 {
+		var args []string
+		for _, i := range res {
+			args = append(args, i.Arguments)
+		}
+		return strings.Join(args, "\n")
+	}
 	return ""
 }
 

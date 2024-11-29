@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/sunshineplan/ai"
@@ -202,6 +203,13 @@ func (resp *ChatResponse[Response]) String() string {
 	if res := resp.Results(); len(res) > 0 {
 		return res[0]
 	}
+	if res := resp.FunctionCalls(); len(res) > 0 {
+		var args []string
+		for _, i := range res {
+			args = append(args, i.Arguments)
+		}
+		return strings.Join(args, "\n")
+	}
 	return ""
 }
 
@@ -250,7 +258,15 @@ func (c *ChatGPT) createRequest(
 		)
 	}
 	var msgs []openai.ChatCompletionMessageParamUnion
-	msgs = append(msgs, history...)
+	for _, i := range history {
+		switch v := i.(type) {
+		case openai.ChatCompletionMessage:
+			if len(v.ToolCalls) > 0 {
+				continue
+			}
+		}
+		msgs = append(msgs, i)
+	}
 	for _, i := range messages {
 		switch v := i.(type) {
 		case ai.Text:
