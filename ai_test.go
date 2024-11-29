@@ -271,7 +271,6 @@ func TestGemini(t *testing.T) {
 	if err := testChatSession(model, gemini); err != nil {
 		t.Error(err)
 	}
-	testFunctionCall(t, os.Getenv("GEMINI_MODEL_FOR_TOOLS"), gemini)
 	if modelForImage := os.Getenv("GEMINI_MODEL_FOR_IMAGE"); modelForImage != "" {
 		gemini.SetModel(modelForImage)
 	} else {
@@ -286,6 +285,7 @@ func TestGemini(t *testing.T) {
 		fmt.Println(resp)
 		checkMatch(t, resp.Results()[0], "man|person", "computer|laptop")
 	}
+	testFunctionCall(t, os.Getenv("GEMINI_MODEL_FOR_TOOLS"), gemini)
 }
 
 func TestChatGPT(t *testing.T) {
@@ -312,7 +312,6 @@ func TestChatGPT(t *testing.T) {
 	if err := testChatSession(model, chatgpt); err != nil {
 		t.Error(err)
 	}
-	testFunctionCall(t, os.Getenv("CHATGPT_MODEL_FOR_TOOLS"), chatgpt)
 	if modelForImage := os.Getenv("CHATGPT_MODEL_FOR_IMAGE"); modelForImage != "" {
 		chatgpt.SetModel(modelForImage)
 	} else {
@@ -327,6 +326,7 @@ func TestChatGPT(t *testing.T) {
 		fmt.Println(resp)
 		checkMatch(t, resp.Results()[0], "man|person", "computer|laptop")
 	}
+	testFunctionCall(t, os.Getenv("CHATGPT_MODEL_FOR_TOOLS"), chatgpt)
 }
 
 func TestAnthropic(t *testing.T) {
@@ -353,7 +353,6 @@ func TestAnthropic(t *testing.T) {
 	if err := testChatSession(model, anthropic); err != nil {
 		t.Error(err)
 	}
-	testFunctionCall(t, os.Getenv("ANTHROPIC_MODEL_FOR_TOOLS"), anthropic)
 	if modelForImage := os.Getenv("ANTHROPIC_MODEL_FOR_IMAGE"); modelForImage != "" {
 		anthropic.SetModel(modelForImage)
 	} else {
@@ -368,4 +367,5 @@ func TestAnthropic(t *testing.T) {
 		fmt.Println(resp)
 		checkMatch(t, resp.Results()[0], "man|person", "computer|laptop")
 	}
+	testFunctionCall(t, os.Getenv("ANTHROPIC_MODEL_FOR_TOOLS"), anthropic)
 }
