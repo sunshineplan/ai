@@ -2,6 +2,7 @@ package gemini
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"math"
@@ -106,12 +107,59 @@ func (ai *Gemini) SetModel(model string) {
 	ai.model.GenerationConfig = ai.config
 }
 
+func (gemini *Gemini) SetFunctionCall(f []ai.Function, mode ai.FunctionCallingMode) {
+	var declarations []*genai.FunctionDeclaration
+	for _, i := range f {
+		b, _ := json.Marshal(i.Parameters)
+		var p map[string]*genai.Schema
+		if err := json.Unmarshal(b, &p); err != nil {
+			continue
+		}
+		var t genai.Type
+		switch strings.ToLower(i.Parameters.Type) {
+		case "string":
+			t = genai.TypeString
+		case "number":
+			t = genai.TypeNumber
+		case "integer":
+			t = genai.TypeInteger
+		case "boolean":
+			t = genai.TypeBoolean
+		case "array":
+			t = genai.TypeArray
+		case "object":
+			t = genai.TypeObject
+		}
+		declarations = append(declarations, &genai.FunctionDeclaration{
+			Name:        i.Name,
+			Description: i.Description,
+			Parameters:  &genai.Schema{Type: t, Properties: p, Enum: i.Parameters.Enum, Required: i.Parameters.Required},
+		})
+	}
+	gemini.model.Tools = []*genai.Tool{{FunctionDeclarations: declarations}}
+	switch mode {
+	case ai.FunctionCallingAuto:
+		gemini.model.ToolConfig = &genai.ToolConfig{
+			FunctionCallingConfig: &genai.FunctionCallingConfig{Mode: genai.FunctionCallingAuto},
+		}
+	case ai.FunctionCallingAny:
+		gemini.model.ToolConfig = &genai.ToolConfig{
+			FunctionCallingConfig: &genai.FunctionCallingConfig{Mode: genai.FunctionCallingAny},
+		}
+	case ai.FunctionCallingNone:
+		gemini.model.ToolConfig = &genai.ToolConfig{
+			FunctionCallingConfig: &genai.FunctionCallingConfig{Mode: genai.FunctionCallingNone},
+		}
+	default:
+		gemini.model.ToolConfig = nil
+	}
+}
 func (ai *Gemini) SetCount(i int64)         { ai.config.SetCandidateCount(int32(i)) }
 func (ai *Gemini) SetMaxTokens(i int64)     { ai.config.SetMaxOutputTokens(int32(i)) }
 func (ai *Gemini) SetTemperature(f float64) { ai.config.SetTemperature(float32(f)) }
 func (ai *Gemini) SetTopP(f float64)        { ai.config.SetTopP(float32(f)) }
-func (ai *Gemini) SetJSONResponse(b bool) {
-	if b {
+func (ai *Gemini) SetJSONResponse(json bool) {
+	if json {
 		ai.config.ResponseMIMEType = "application/json"
 	} else {
 		ai.config.ResponseMIMEType = "text/plain"
@@ -125,6 +173,22 @@ func toParts(src []ai.Part) (dst []genai.Part) {
 			dst = append(dst, genai.Text(v))
 		case ai.Image:
 			dst = append(dst, genai.Blob(v))
+		case ai.FunctionCall:
+			b, err := json.Marshal(v.Arguments)
+			if err != nil {
+				panic(err)
+			}
+			var args map[string]any
+			if err := json.Unmarshal(b, &args); err != nil {
+				panic(err)
+			}
+			dst = append(dst, genai.FunctionCall{Name: v.ID, Args: args})
+		case ai.FunctionResponse:
+			var resp map[string]any
+			if err := json.Unmarshal([]byte(v.Response), &resp); err != nil {
+				panic(err)
+			}
+			dst = append(dst, genai.FunctionResponse{Name: v.ID, Response: resp})
 		}
 	}
 	return
@@ -137,6 +201,18 @@ func fromParts(src []genai.Part) (dst []ai.Part) {
 			dst = append(dst, ai.Text(v))
 		case genai.Blob:
 			dst = append(dst, ai.Image(v))
+		case genai.FunctionCall:
+			b, err := json.Marshal(v.Args)
+			if err != nil {
+				panic(err)
+			}
+			dst = append(dst, ai.FunctionCall{ID: v.Name, Name: v.Name, Arguments: string(b)})
+		case genai.FunctionResponse:
+			b, err := json.Marshal(v.Response)
+			if err != nil {
+				panic(err)
+			}
+			dst = append(dst, ai.FunctionResponse{ID: v.Name, Response: string(b)})
 		}
 	}
 	return
@@ -167,6 +243,23 @@ func (resp *ChatResponse) Results() (res []string) {
 	return
 }
 
+func (resp *ChatResponse) FunctionCalls() (res []ai.FunctionCall) {
+	for _, i := range resp.Candidates {
+		if i.Content != nil {
+			for _, i := range i.Content.Parts {
+				if v, ok := i.(genai.FunctionCall); ok {
+					b, err := json.Marshal(v.Args)
+					if err != nil {
+						panic(err)
+					}
+					res = append(res, ai.FunctionCall{ID: v.Name, Name: v.Name, Arguments: string(b)})
+				}
+			}
+		}
+	}
+	return
+}
+
 func (resp *ChatResponse) TokenCount() (res ai.TokenCount) {
 	if usage := resp.UsageMetadata; usage != nil {
 		res.Prompt = int64(usage.PromptTokenCount)
@@ -179,6 +272,13 @@ func (resp *ChatResponse) TokenCount() (res ai.TokenCount) {
 func (resp *ChatResponse) String() string {
 	if res := resp.Results(); len(res) > 0 {
 		return res[0]
+	}
+	if res := resp.FunctionCalls(); len(res) > 0 {
+		var args []string
+		for _, i := range res {
+			args = append(args, i.Arguments)
+		}
+		return strings.Join(args, "\n")
 	}
 	return ""
 }

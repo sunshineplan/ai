@@ -22,7 +22,29 @@ type AI interface {
 	Close() error
 }
 
+type Function struct {
+	Name        string
+	Description string
+	Parameters  Schema
+}
+
+type Schema struct {
+	Type       string         `json:"type"`
+	Properties map[string]any `json:"properties"`
+	Enum       []string       `json:"enum,omitempty"`
+	Required   []string       `json:"required"`
+}
+
+type FunctionCallingMode int
+
+const (
+	FunctionCallingAuto FunctionCallingMode = iota
+	FunctionCallingAny
+	FunctionCallingNone
+)
+
 type Model interface {
+	SetFunctionCall([]Function, FunctionCallingMode)
 	SetCount(x int64)
 	SetMaxTokens(x int64)
 	SetTemperature(x float64)
@@ -54,5 +76,6 @@ type TokenCount struct {
 type ChatResponse interface {
 	Raw() any
 	Results() []string
+	FunctionCalls() []FunctionCall
 	TokenCount() TokenCount
 }
