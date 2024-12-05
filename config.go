@@ -19,6 +19,8 @@ type ModelConfig struct {
 	Temperature  *float64
 	TopP         *float64
 	JSONResponse *bool
+	Tools        []Function
+	ToolConfig   FunctionCallingMode
 }
 
 func ApplyModelConfig(ai AI, cfg ModelConfig) {
@@ -37,6 +39,7 @@ func ApplyModelConfig(ai AI, cfg ModelConfig) {
 	if cfg.JSONResponse != nil {
 		ai.SetJSONResponse(*cfg.JSONResponse)
 	}
+	ai.SetFunctionCall(cfg.Tools, cfg.ToolConfig)
 }
 
 type ClientOption interface {

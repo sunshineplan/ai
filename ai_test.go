@@ -347,3 +347,28 @@ func TestAnthropic(t *testing.T) {
 	testImage(t, os.Getenv("ANTHROPIC_MODEL_FOR_IMAGE"), anthropic)
 	testFunctionCall(t, os.Getenv("ANTHROPIC_MODEL_FOR_TOOLS"), anthropic)
 }
+
+func TestUnmarshalFunctionCallingMode(t *testing.T) {
+	var m ai.FunctionCallingMode
+	if err := json.Unmarshal([]byte(`"any"`), &m); err != nil {
+		t.Fatal(err)
+	}
+	if m != ai.FunctionCallingAny {
+		t.Errorf("expected %d; got %d", ai.FunctionCallingAny, m)
+	}
+	var s struct {
+		Mode ai.FunctionCallingMode
+	}
+	if err := json.Unmarshal([]byte(`{"mode":"none"}`), &s); err != nil {
+		t.Fatal(err)
+	}
+	if s.Mode != ai.FunctionCallingNone {
+		t.Errorf("expected %d; got %d", ai.FunctionCallingNone, s.Mode)
+	}
+	if err := json.Unmarshal([]byte(`"test"`), &m); err != nil {
+		t.Fatal(err)
+	}
+	if m != 0 {
+		t.Errorf("expected %d; got %d", 0, m)
+	}
+}
