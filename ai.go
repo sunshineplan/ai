@@ -2,7 +2,9 @@ package ai
 
 import (
 	"context"
+	"encoding"
 	"errors"
+	"strings"
 )
 
 var ErrAIClosed = errors.New("AI client is nil or already closed")
@@ -35,10 +37,26 @@ type Schema struct {
 	Required   []string       `json:"required"`
 }
 
+var _ encoding.TextUnmarshaler = new(FunctionCallingMode)
+
 type FunctionCallingMode int
 
+func (m *FunctionCallingMode) UnmarshalText(text []byte) error {
+	switch strings.ToLower(string(text)) {
+	case "auto":
+		*m = FunctionCallingAuto
+	case "any":
+		*m = FunctionCallingAny
+	case "none":
+		*m = FunctionCallingNone
+	default:
+		*m = 0
+	}
+	return nil
+}
+
 const (
-	FunctionCallingAuto FunctionCallingMode = iota
+	FunctionCallingAuto FunctionCallingMode = iota + 1
 	FunctionCallingAny
 	FunctionCallingNone
 )
