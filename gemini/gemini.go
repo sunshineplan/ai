@@ -110,30 +110,19 @@ func (ai *Gemini) SetModel(model string) {
 func (gemini *Gemini) SetFunctionCall(f []ai.Function, mode ai.FunctionCallingMode) {
 	var declarations []*genai.FunctionDeclaration
 	for _, i := range f {
-		b, _ := json.Marshal(i.Parameters)
-		var p map[string]*genai.Schema
-		if err := json.Unmarshal(b, &p); err != nil {
+		p, err := genaiProperties(i.Parameters.Properties)
+		if err != nil {
 			continue
-		}
-		var t genai.Type
-		switch strings.ToLower(i.Parameters.Type) {
-		case "string":
-			t = genai.TypeString
-		case "number":
-			t = genai.TypeNumber
-		case "integer":
-			t = genai.TypeInteger
-		case "boolean":
-			t = genai.TypeBoolean
-		case "array":
-			t = genai.TypeArray
-		case "object":
-			t = genai.TypeObject
 		}
 		declarations = append(declarations, &genai.FunctionDeclaration{
 			Name:        i.Name,
 			Description: i.Description,
-			Parameters:  &genai.Schema{Type: t, Properties: p, Enum: i.Parameters.Enum, Required: i.Parameters.Required},
+			Parameters: &genai.Schema{
+				Type:       genaiType(i.Parameters.Type),
+				Properties: p,
+				Enum:       i.Parameters.Enum,
+				Required:   i.Parameters.Required,
+			},
 		})
 	}
 	gemini.model.Tools = []*genai.Tool{{FunctionDeclarations: declarations}}

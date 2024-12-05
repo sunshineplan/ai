@@ -115,6 +115,23 @@ func testChatSession(model string, c ai.AI) error {
 	return nil
 }
 
+func testImage(t *testing.T, model string, c ai.AI) {
+	if model == "" {
+		return
+	} else {
+		c.SetModel(model)
+	}
+	img, err := os.ReadFile("testdata/personWorkingOnComputer.jpg")
+	if err == nil {
+		resp, err := c.Chat(context.Background(), ai.ImageData("image/jpeg", img), ai.Text("What is in this picture?"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		fmt.Println(resp)
+		checkMatch(t, resp.Results()[0], "man|person", "computer|laptop")
+	}
+}
+
 func testFunctionCall(t *testing.T, model string, c ai.AI) {
 	if model == "" {
 		return
@@ -271,20 +288,7 @@ func TestGemini(t *testing.T) {
 	if err := testChatSession(model, gemini); err != nil {
 		t.Error(err)
 	}
-	if modelForImage := os.Getenv("GEMINI_MODEL_FOR_IMAGE"); modelForImage != "" {
-		gemini.SetModel(modelForImage)
-	} else {
-		return
-	}
-	img, err := os.ReadFile("testdata/personWorkingOnComputer.jpg")
-	if err == nil {
-		resp, err := gemini.Chat(context.Background(), ai.ImageData("image/jpeg", img), ai.Text("What is in this picture?"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		fmt.Println(resp)
-		checkMatch(t, resp.Results()[0], "man|person", "computer|laptop")
-	}
+	testImage(t, os.Getenv("GEMINI_MODEL_FOR_IMAGE"), gemini)
 	testFunctionCall(t, os.Getenv("GEMINI_MODEL_FOR_TOOLS"), gemini)
 }
 
@@ -312,20 +316,7 @@ func TestChatGPT(t *testing.T) {
 	if err := testChatSession(model, chatgpt); err != nil {
 		t.Error(err)
 	}
-	if modelForImage := os.Getenv("CHATGPT_MODEL_FOR_IMAGE"); modelForImage != "" {
-		chatgpt.SetModel(modelForImage)
-	} else {
-		return
-	}
-	img, err := os.ReadFile("testdata/personWorkingOnComputer.jpg")
-	if err == nil {
-		resp, err := chatgpt.Chat(context.Background(), ai.ImageData("image/jpeg", img), ai.Text("What is in this picture?"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		fmt.Println(resp)
-		checkMatch(t, resp.Results()[0], "man|person", "computer|laptop")
-	}
+	testImage(t, os.Getenv("CHATGPT_MODEL_FOR_IMAGE"), chatgpt)
 	testFunctionCall(t, os.Getenv("CHATGPT_MODEL_FOR_TOOLS"), chatgpt)
 }
 
@@ -353,19 +344,6 @@ func TestAnthropic(t *testing.T) {
 	if err := testChatSession(model, anthropic); err != nil {
 		t.Error(err)
 	}
-	if modelForImage := os.Getenv("ANTHROPIC_MODEL_FOR_IMAGE"); modelForImage != "" {
-		anthropic.SetModel(modelForImage)
-	} else {
-		return
-	}
-	img, err := os.ReadFile("testdata/personWorkingOnComputer.jpg")
-	if err == nil {
-		resp, err := anthropic.Chat(context.Background(), ai.ImageData("image/jpeg", img), ai.Text("What is in this picture?"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		fmt.Println(resp)
-		checkMatch(t, resp.Results()[0], "man|person", "computer|laptop")
-	}
+	testImage(t, os.Getenv("ANTHROPIC_MODEL_FOR_IMAGE"), anthropic)
 	testFunctionCall(t, os.Getenv("ANTHROPIC_MODEL_FOR_TOOLS"), anthropic)
 }
