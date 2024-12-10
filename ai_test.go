@@ -139,6 +139,10 @@ func testFunctionCall(t *testing.T, model string, c ai.AI) {
 		c.SetModel(model)
 	}
 	c.SetTemperature(0)
+	c.SetFunctionCall(nil, ai.FunctionCallingAuto)
+	if _, err := c.Chat(context.Background(), ai.Text("Which theaters in Mountain View show Barbie movie?")); err != nil {
+		t.Fatal(err)
+	}
 	movieChat := func(t *testing.T, s ai.Schema, fcm ai.FunctionCallingMode) {
 		movieTool := ai.Function{
 			Name:        "find_theaters",

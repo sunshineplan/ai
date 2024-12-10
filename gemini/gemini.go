@@ -108,6 +108,11 @@ func (ai *Gemini) SetModel(model string) {
 }
 
 func (gemini *Gemini) SetFunctionCall(f []ai.Function, mode ai.FunctionCallingMode) {
+	if len(f) == 0 {
+		gemini.model.Tools = nil
+		gemini.model.ToolConfig = nil
+		return
+	}
 	var declarations []*genai.FunctionDeclaration
 	for _, i := range f {
 		p, err := genaiProperties(i.Parameters.Properties)

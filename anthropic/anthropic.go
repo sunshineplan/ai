@@ -106,7 +106,10 @@ func (ai *Anthropic) wait(ctx context.Context) error {
 
 func (ai *Anthropic) SetModel(model string) { ai.model = model }
 func (a *Anthropic) SetFunctionCall(f []ai.Function, mode ai.FunctionCallingMode) {
-	a.tools = nil
+	if a.tools = nil; len(f) == 0 {
+		a.toolChoice = nil
+		return
+	}
 	for _, i := range f {
 		a.tools = append(a.tools, anthropic.ToolParam{
 			Name:        anthropic.String(i.Name),

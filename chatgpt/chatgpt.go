@@ -108,7 +108,10 @@ func (ai *ChatGPT) wait(ctx context.Context) error {
 
 func (ai *ChatGPT) SetModel(model string) { ai.model = model }
 func (chatgpt *ChatGPT) SetFunctionCall(f []ai.Function, mode ai.FunctionCallingMode) {
-	chatgpt.tools = nil
+	if chatgpt.tools = nil; len(f) == 0 {
+		chatgpt.toolChoice = nil
+		return
+	}
 	for _, i := range f {
 		var parameters shared.FunctionParameters
 		b, _ := json.Marshal(i.Parameters)
