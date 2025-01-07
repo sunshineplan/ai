@@ -166,6 +166,9 @@ func toParts(src []ai.Part) (dst []genai.Part) {
 		case ai.Text:
 			dst = append(dst, genai.Text(v))
 		case ai.Image:
+			mime, data := v.Data()
+			dst = append(dst, genai.Blob{MIMEType: mime, Data: data})
+		case ai.Blob:
 			dst = append(dst, genai.Blob(v))
 		case ai.FunctionCall:
 			b, err := json.Marshal(v.Arguments)
@@ -194,7 +197,7 @@ func fromParts(src []genai.Part) (dst []ai.Part) {
 		case genai.Text:
 			dst = append(dst, ai.Text(v))
 		case genai.Blob:
-			dst = append(dst, ai.Image(v))
+			dst = append(dst, ai.Blob(v))
 		case genai.FunctionCall:
 			b, err := json.Marshal(v.Args)
 			if err != nil {

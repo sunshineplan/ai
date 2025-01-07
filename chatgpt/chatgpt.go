@@ -2,14 +2,11 @@ package chatgpt
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io"
 	"math"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
 
@@ -217,16 +214,11 @@ func (resp *ChatResponse[Response]) String() string {
 }
 
 func toImagePart(img ai.Image) openai.ChatCompletionContentPartImageParam {
-	return openai.ImagePart(fmt.Sprintf("data:%s;base64,%s", img.MIMEType, base64.StdEncoding.EncodeToString(img.Data)))
+	return openai.ImagePart(string(img))
 }
 
 func fromImagePart(img openai.ChatCompletionContentPartImageParam) ai.Image {
-	res := regexp.MustCompile("^data:(.+);base64,(.+)$").FindStringSubmatch(img.ImageURL.Value.URL.Value)
-	b, err := base64.StdEncoding.DecodeString(res[1])
-	if err != nil {
-		panic(err)
-	}
-	return ai.ImageData(res[0], b)
+	return ai.Image(img.ImageURL.Value.URL.Value)
 }
 
 func (c *ChatGPT) createRequest(
@@ -275,7 +267,9 @@ func (c *ChatGPT) createRequest(
 		case ai.Text:
 			msgs = append(msgs, openai.UserMessage(string(v)))
 		case ai.Image:
-			msgs = append(msgs, openai.UserMessageParts(toImagePart((v))))
+			msgs = append(msgs, openai.UserMessageParts(toImagePart(v)))
+		case ai.Blob:
+			msgs = append(msgs, openai.UserMessageParts(toImagePart(ai.ImageData(v.MIMEType, v.Data))))
 		case ai.FunctionResponse:
 			msgs = append(msgs, openai.ToolMessage(v.ID, v.Response))
 		}
@@ -403,6 +397,8 @@ func (session *ChatSession) addUserHistory(messages ...ai.Part) {
 			session.history = append(session.history, openai.UserMessage(string(v)))
 		case ai.Image:
 			session.history = append(session.history, openai.UserMessageParts(toImagePart(v)))
+		case ai.Blob:
+			session.history = append(session.history, openai.UserMessageParts(toImagePart(ai.ImageData(v.MIMEType, v.Data))))
 		case ai.FunctionResponse:
 			session.history = append(session.history, openai.ToolMessage(v.ID, v.Response))
 		}

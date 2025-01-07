@@ -237,7 +237,8 @@ func (resp *ChatResponse[Response]) String() string {
 }
 
 func toImageBlock(img ai.Image) anthropic.ImageBlockParam {
-	return anthropic.NewImageBlockBase64(img.MIMEType, base64.StdEncoding.EncodeToString(img.Data))
+	mime, data := img.Data()
+	return anthropic.NewImageBlockBase64(mime, base64.StdEncoding.EncodeToString(data))
 }
 
 func fromImageBlockSource(src anthropic.ImageBlockParamSource) ai.Image {
@@ -285,7 +286,9 @@ func (c *Anthropic) createRequest(
 		case ai.Text:
 			msgs = append(msgs, anthropic.NewUserMessage(anthropic.NewTextBlock(string(v))))
 		case ai.Image:
-			msgs = append(msgs, anthropic.NewUserMessage(toImageBlock((v))))
+			msgs = append(msgs, anthropic.NewUserMessage(toImageBlock(v)))
+		case ai.Blob:
+			msgs = append(msgs, anthropic.NewUserMessage(toImageBlock(ai.ImageData(v.MIMEType, v.Data))))
 		case ai.FunctionResponse:
 			msgs = append(msgs, anthropic.NewUserMessage(anthropic.NewToolResultBlock(v.ID, v.Response, false)))
 		}
@@ -420,7 +423,9 @@ func (session *ChatSession) addUserHistory(messages ...ai.Part) {
 		case ai.Text:
 			session.history = append(session.history, anthropic.NewUserMessage(anthropic.NewTextBlock(string(v))))
 		case ai.Image:
-			session.history = append(session.history, anthropic.NewUserMessage(toImageBlock((v))))
+			session.history = append(session.history, anthropic.NewUserMessage(toImageBlock(v)))
+		case ai.Blob:
+			session.history = append(session.history, anthropic.NewUserMessage(toImageBlock(ai.ImageData(v.MIMEType, v.Data))))
 		case ai.FunctionResponse:
 			session.history = append(session.history, anthropic.NewUserMessage(anthropic.NewToolResultBlock(v.ID, v.Response, false)))
 		}

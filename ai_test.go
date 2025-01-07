@@ -107,7 +107,7 @@ func testChatSession(model string, c ai.AI) error {
 			case ai.Text:
 				fmt.Println(i.Role, ":", v)
 			case ai.Image:
-				fmt.Printf("%s : [%s]", i.Role, v.MIMEType)
+				fmt.Printf("%s : [%s]", i.Role, v.MIMEType())
 			}
 		}
 	}
