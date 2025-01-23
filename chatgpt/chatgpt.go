@@ -124,11 +124,11 @@ func (chatgpt *ChatGPT) SetFunctionCall(f []ai.Function, mode ai.FunctionCalling
 	}
 	switch mode {
 	case ai.FunctionCallingAuto:
-		chatgpt.toolChoice = openai.ChatCompletionToolChoiceOptionBehaviorAuto
+		chatgpt.toolChoice = openai.ChatCompletionToolChoiceOptionAutoAuto
 	case ai.FunctionCallingAny:
-		chatgpt.toolChoice = openai.ChatCompletionToolChoiceOptionBehaviorRequired
+		chatgpt.toolChoice = openai.ChatCompletionToolChoiceOptionAutoRequired
 	case ai.FunctionCallingNone:
-		chatgpt.toolChoice = openai.ChatCompletionToolChoiceOptionBehaviorNone
+		chatgpt.toolChoice = openai.ChatCompletionToolChoiceOptionAutoNone
 	default:
 		chatgpt.toolChoice = nil
 	}
