@@ -19,7 +19,7 @@ import (
 	"google.golang.org/api/option"
 )
 
-const defaultModel = "gemini-1.5-flash"
+const defaultModel = "gemini-2.0-flash"
 
 var _ ai.AI = new(Gemini)
 
