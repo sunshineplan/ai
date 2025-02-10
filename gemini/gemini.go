@@ -194,9 +194,12 @@ func (ai *Gemini) SetJSONResponse(set bool, schema *ai.JSONSchema) {
 		ai.config.ResponseMIMEType = "application/json"
 		if schema != nil {
 			ai.config.ResponseSchema, _ = genaiSchema(&schema.Schema)
+		} else {
+			ai.config.ResponseSchema = nil
 		}
 	} else {
 		ai.config.ResponseMIMEType = "text/plain"
+		ai.config.ResponseSchema = nil
 	}
 	ai.model.GenerationConfig = ai.config
 }
