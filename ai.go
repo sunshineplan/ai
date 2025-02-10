@@ -24,17 +24,24 @@ type AI interface {
 	Close() error
 }
 
-type Function struct {
-	Name        string
-	Description string
-	Parameters  Schema
-}
-
 type Schema struct {
 	Type       string         `json:"type"`
 	Properties map[string]any `json:"properties"`
 	Enum       []string       `json:"enum,omitempty"`
-	Required   []string       `json:"required"`
+	Items      *Schema        `json:"items,omitempty"`
+	Required   []string       `json:"required,omitempty"`
+}
+
+type JSONSchema struct {
+	Name        string
+	Description string
+	Schema      Schema
+}
+
+type Function struct {
+	Name        string
+	Description string
+	Parameters  Schema
 }
 
 var _ encoding.TextUnmarshaler = new(FunctionCallingMode)
@@ -67,7 +74,7 @@ type Model interface {
 	SetMaxTokens(x int64)
 	SetTemperature(x float64)
 	SetTopP(x float64)
-	SetJSONResponse(b bool)
+	SetJSONResponse(set bool, schema *JSONSchema)
 }
 
 type Chatbot interface {

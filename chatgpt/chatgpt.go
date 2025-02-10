@@ -32,7 +32,7 @@ type ChatGPT struct {
 	temperature *float64
 	topP        *float64
 	count       *int64
-	json        *bool
+	json        openai.ChatCompletionNewParamsResponseFormatUnion
 
 	limiter *rate.Limiter
 }
@@ -137,7 +137,29 @@ func (ai *ChatGPT) SetCount(i int64)         { ai.count = &i }
 func (ai *ChatGPT) SetMaxTokens(i int64)     { ai.maxTokens = &i }
 func (ai *ChatGPT) SetTemperature(f float64) { ai.temperature = &f }
 func (ai *ChatGPT) SetTopP(f float64)        { ai.topP = &f }
-func (ai *ChatGPT) SetJSONResponse(b bool)   { ai.json = &b }
+func (ai *ChatGPT) SetJSONResponse(set bool, schema *ai.JSONSchema) {
+	var responseFormat openai.ChatCompletionNewParamsResponseFormatUnion
+	if set {
+		if schema != nil {
+			var format any
+			b, _ := json.Marshal(schema.Schema)
+			_ = json.Unmarshal(b, &format)
+			responseFormat = shared.ResponseFormatJSONSchemaParam{
+				Type: openai.F(shared.ResponseFormatJSONSchemaTypeJSONSchema),
+				JSONSchema: openai.F(shared.ResponseFormatJSONSchemaJSONSchemaParam{
+					Name:        openai.String(schema.Name),
+					Description: openai.String(schema.Description),
+					Schema:      openai.F(format),
+				}),
+			}
+		} else {
+			responseFormat = shared.ResponseFormatJSONObjectParam{
+				Type: openai.F(shared.ResponseFormatJSONObjectTypeJSONObject),
+			}
+		}
+	}
+	ai.json = responseFormat
+}
 
 var _ ai.ChatResponse = new(ChatResponse[*openai.ChatCompletion])
 
@@ -245,12 +267,8 @@ func (c *ChatGPT) createRequest(
 	if c.topP != nil {
 		req.TopP = openai.Float(*c.topP)
 	}
-	if c.json != nil && *c.json {
-		req.ResponseFormat = openai.F[openai.ChatCompletionNewParamsResponseFormatUnion](
-			openai.ChatCompletionNewParamsResponseFormat{
-				Type: openai.F(openai.ChatCompletionNewParamsResponseFormatTypeJSONObject),
-			},
-		)
+	if c.json != nil {
+		req.ResponseFormat = openai.F(c.json)
 	}
 	var msgs []openai.ChatCompletionMessageParamUnion
 	for _, i := range history {
