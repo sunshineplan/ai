@@ -191,6 +191,7 @@ func testJSON(t *testing.T, model string, c ai.AI) {
 			t.Fatal(err)
 		}
 	}
+	c.SetJSONResponse(false, nil)
 }
 
 func testFunctionCall(t *testing.T, model string, c ai.AI) {
