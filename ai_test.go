@@ -132,6 +132,67 @@ func testImage(t *testing.T, model string, c ai.AI) {
 	}
 }
 
+func testJSON(t *testing.T, model string, c ai.AI) {
+	if model == "" {
+		return
+	} else {
+		c.SetModel(model)
+	}
+	c.SetTemperature(0)
+	c.SetJSONResponse(true, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	resp, err := c.Chat(ctx, ai.Text("List the primary colors."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res := resp.Results(); len(res) == 0 {
+		t.Fatal("no result")
+	} else {
+		t.Log(res[0])
+		var a any
+		if err := json.Unmarshal([]byte(res[0]), &a); err != nil {
+			t.Fatal(err)
+		}
+	}
+	c.SetJSONResponse(true, &ai.JSONSchema{
+		Name: "color list",
+		Schema: ai.Schema{
+			Type: "array",
+			Items: &ai.Schema{
+				Type: "object",
+				Properties: map[string]any{
+					"name": map[string]string{
+						"type":        "string",
+						"description": "The name of the color",
+					},
+					"RGB": map[string]string{
+						"type":        "string",
+						"description": "The RGB value of the color, in hex",
+					},
+				},
+				Required: []string{"name", "RGB"},
+			},
+		},
+	})
+	resp, err = c.Chat(ctx, ai.Text("List the primary colors."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res := resp.Results(); len(res) == 0 {
+		t.Fatal("no result")
+	} else {
+		t.Log(res[0])
+		type color struct {
+			Name, RGB string
+		}
+		var v []color
+		if err := json.Unmarshal([]byte(res[0]), &v); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func testFunctionCall(t *testing.T, model string, c ai.AI) {
 	if model == "" {
 		return
@@ -292,6 +353,7 @@ func TestGemini(t *testing.T) {
 	if err := testChatSession(model, gemini); err != nil {
 		t.Error(err)
 	}
+	testJSON(t, model, gemini)
 	testImage(t, os.Getenv("GEMINI_MODEL_FOR_IMAGE"), gemini)
 	testFunctionCall(t, os.Getenv("GEMINI_MODEL_FOR_TOOLS"), gemini)
 }
@@ -320,6 +382,7 @@ func TestChatGPT(t *testing.T) {
 	if err := testChatSession(model, chatgpt); err != nil {
 		t.Error(err)
 	}
+	testJSON(t, model, chatgpt)
 	testImage(t, os.Getenv("CHATGPT_MODEL_FOR_IMAGE"), chatgpt)
 	testFunctionCall(t, os.Getenv("CHATGPT_MODEL_FOR_TOOLS"), chatgpt)
 }

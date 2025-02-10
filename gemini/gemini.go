@@ -107,6 +107,36 @@ func (ai *Gemini) SetModel(model string) {
 	ai.model.GenerationConfig = ai.config
 }
 
+func genaiSchema(schema *ai.Schema) (*genai.Schema, error) {
+	if schema == nil {
+		return nil, nil
+	}
+	p, err := genaiProperties(schema.Properties)
+	if err != nil {
+		return nil, err
+	}
+	var items *genai.Schema
+	if schema.Items != nil {
+		p, err := genaiProperties(schema.Items.Properties)
+		if err != nil {
+			return nil, err
+		}
+		items = &genai.Schema{
+			Type:       genaiType(schema.Items.Type),
+			Properties: p,
+			Enum:       schema.Items.Enum,
+			Required:   schema.Items.Required,
+		}
+	}
+	return &genai.Schema{
+		Type:       genaiType(schema.Type),
+		Properties: p,
+		Enum:       schema.Enum,
+		Items:      items,
+		Required:   schema.Required,
+	}, nil
+}
+
 func (gemini *Gemini) SetFunctionCall(f []ai.Function, mode ai.FunctionCallingMode) {
 	if len(f) == 0 {
 		gemini.model.Tools = nil
@@ -115,19 +145,14 @@ func (gemini *Gemini) SetFunctionCall(f []ai.Function, mode ai.FunctionCallingMo
 	}
 	var declarations []*genai.FunctionDeclaration
 	for _, i := range f {
-		p, err := genaiProperties(i.Parameters.Properties)
+		schema, err := genaiSchema(&i.Parameters)
 		if err != nil {
 			continue
 		}
 		declarations = append(declarations, &genai.FunctionDeclaration{
 			Name:        i.Name,
 			Description: i.Description,
-			Parameters: &genai.Schema{
-				Type:       genaiType(i.Parameters.Type),
-				Properties: p,
-				Enum:       i.Parameters.Enum,
-				Required:   i.Parameters.Required,
-			},
+			Parameters:  schema,
 		})
 	}
 	gemini.model.Tools = []*genai.Tool{{FunctionDeclarations: declarations}}
@@ -148,16 +173,32 @@ func (gemini *Gemini) SetFunctionCall(f []ai.Function, mode ai.FunctionCallingMo
 		gemini.model.ToolConfig = nil
 	}
 }
-func (ai *Gemini) SetCount(i int64)         { ai.config.SetCandidateCount(int32(i)) }
-func (ai *Gemini) SetMaxTokens(i int64)     { ai.config.SetMaxOutputTokens(int32(i)) }
-func (ai *Gemini) SetTemperature(f float64) { ai.config.SetTemperature(float32(f)) }
-func (ai *Gemini) SetTopP(f float64)        { ai.config.SetTopP(float32(f)) }
-func (ai *Gemini) SetJSONResponse(json bool) {
-	if json {
+func (ai *Gemini) SetCount(i int64) {
+	ai.config.SetCandidateCount(int32(i))
+	ai.model.GenerationConfig = ai.config
+}
+func (ai *Gemini) SetMaxTokens(i int64) {
+	ai.config.SetMaxOutputTokens(int32(i))
+	ai.model.GenerationConfig = ai.config
+}
+func (ai *Gemini) SetTemperature(f float64) {
+	ai.config.SetTemperature(float32(f))
+	ai.model.GenerationConfig = ai.config
+}
+func (ai *Gemini) SetTopP(f float64) {
+	ai.config.SetTopP(float32(f))
+	ai.model.GenerationConfig = ai.config
+}
+func (ai *Gemini) SetJSONResponse(set bool, schema *ai.JSONSchema) {
+	if set {
 		ai.config.ResponseMIMEType = "application/json"
+		if schema != nil {
+			ai.config.ResponseSchema, _ = genaiSchema(&schema.Schema)
+		}
 	} else {
 		ai.config.ResponseMIMEType = "text/plain"
 	}
+	ai.model.GenerationConfig = ai.config
 }
 
 func toParts(src []ai.Part) (dst []genai.Part) {

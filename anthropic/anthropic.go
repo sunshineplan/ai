@@ -139,7 +139,7 @@ func (ai *Anthropic) SetTopP(f float64)        { ai.topP = &f }
 func (ai *Anthropic) SetCount(i int64) {
 	fmt.Println("Anthropic doesn't support SetCount")
 }
-func (ai *Anthropic) SetJSONResponse(b bool) {
+func (ai *Anthropic) SetJSONResponse(_ bool, _ *ai.JSONSchema) {
 	fmt.Println("Anthropic currently doesn't support SetJSONResponse")
 }
 
