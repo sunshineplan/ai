@@ -1,6 +1,7 @@
 module github.com/sunshineplan/ai
 
-go 1.23
+go 1.24
+
 require (
 	github.com/anthropics/anthropic-sdk-go v0.2.0-alpha.10
 	github.com/google/generative-ai-go v0.19.0
