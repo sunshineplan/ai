@@ -30,7 +30,7 @@ type Anthropic struct {
 	*anthropic.Client
 	model       string
 	toolChoice  anthropic.ToolChoiceUnionParam
-	tools       []anthropic.ToolParam
+	tools       []anthropic.ToolUnionUnionParam
 	maxTokens   *int64
 	temperature *float64
 	topP        *float64
