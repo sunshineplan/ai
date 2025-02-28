@@ -241,12 +241,16 @@ func toImageBlock(img ai.Image) anthropic.ImageBlockParam {
 	return anthropic.NewImageBlockBase64(mime, base64.StdEncoding.EncodeToString(data))
 }
 
-func fromImageBlockSource(src anthropic.ImageBlockParamSource) ai.Image {
-	b, err := base64.StdEncoding.DecodeString(src.Data.Value)
-	if err != nil {
-		panic(err)
+func fromImageBlockSource(src anthropic.ImageBlockParamSourceUnion) ai.Image {
+	switch v := src.(type) {
+	case anthropic.ImageBlockParamSource:
+		b, err := base64.StdEncoding.DecodeString(v.Data.Value)
+		if err != nil {
+			panic(err)
+		}
+		return ai.ImageData(v.MediaType.String(), b)
 	}
-	return ai.ImageData(src.MediaType.String(), b)
+	panic(fmt.Sprintf("unsupported image block source type: %T", src))
 }
 
 func (c *Anthropic) createRequest(
