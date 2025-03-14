@@ -8,7 +8,7 @@ require (
 	github.com/openai/openai-go v0.1.0-alpha.62
 	github.com/sunshineplan/workers v1.0.4
 	golang.org/x/time v0.11.0
-	google.golang.org/api v0.225.0
+	google.golang.org/api v0.226.0
 )
 
 require (
