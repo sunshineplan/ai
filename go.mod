@@ -5,7 +5,7 @@ go 1.24
 require (
 	github.com/anthropics/anthropic-sdk-go v0.2.0-alpha.13
 	github.com/google/generative-ai-go v0.19.0
-	github.com/openai/openai-go v0.1.0-alpha.62
+	github.com/openai/openai-go v0.1.0-alpha.63
 	github.com/sunshineplan/workers v1.0.4
 	golang.org/x/time v0.11.0
 	google.golang.org/api v0.226.0
