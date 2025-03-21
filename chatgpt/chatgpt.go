@@ -14,8 +14,8 @@ import (
 
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
+	"github.com/openai/openai-go/packages/param"
 	"github.com/openai/openai-go/packages/ssestream"
-	"github.com/openai/openai-go/shared"
 	"golang.org/x/time/rate"
 )
 
@@ -67,14 +67,11 @@ func New(opts ...ai.ClientOption) (ai.AI, error) {
 	return c, nil
 }
 
-func NewWithClient(client *openai.Client, model string) ai.AI {
-	if client == nil {
-		panic("cannot create AI from nil client")
-	}
+func NewWithClient(client openai.Client, model string) ai.AI {
 	if model == "" {
 		model = defaultModel
 	}
-	return &ChatGPT{Client: client, model: model}
+	return &ChatGPT{Client: &client, model: model}
 }
 
 func (ChatGPT) LLMs() ai.LLMs {
@@ -106,31 +103,28 @@ func (ai *ChatGPT) wait(ctx context.Context) error {
 func (ai *ChatGPT) SetModel(model string) { ai.model = model }
 func (chatgpt *ChatGPT) SetFunctionCall(f []ai.Function, mode ai.FunctionCallingMode) {
 	if chatgpt.tools = nil; len(f) == 0 {
-		chatgpt.toolChoice = nil
+		chatgpt.toolChoice = openai.ChatCompletionToolChoiceOptionUnionParam{}
 		return
 	}
 	for _, i := range f {
-		var parameters shared.FunctionParameters
+		var parameters openai.FunctionParameters
 		b, _ := json.Marshal(i.Parameters)
 		_ = json.Unmarshal(b, &parameters)
 		chatgpt.tools = append(chatgpt.tools, openai.ChatCompletionToolParam{
-			Type: openai.F(openai.ChatCompletionToolTypeFunction),
-			Function: openai.F(shared.FunctionDefinitionParam{
-				Name:        openai.String(i.Name),
+			Function: openai.FunctionDefinitionParam{
+				Name:        i.Name,
 				Description: openai.String(i.Description),
-				Parameters:  openai.F(parameters),
-			}),
+				Parameters:  parameters,
+			},
 		})
 	}
 	switch mode {
-	case ai.FunctionCallingAuto:
-		chatgpt.toolChoice = openai.ChatCompletionToolChoiceOptionAutoAuto
 	case ai.FunctionCallingAny:
-		chatgpt.toolChoice = openai.ChatCompletionToolChoiceOptionAutoRequired
+		chatgpt.toolChoice = openai.ChatCompletionToolChoiceOptionUnionParam{OfAuto: openai.String("required")}
 	case ai.FunctionCallingNone:
-		chatgpt.toolChoice = openai.ChatCompletionToolChoiceOptionAutoNone
+		chatgpt.toolChoice = openai.ChatCompletionToolChoiceOptionUnionParam{OfAuto: openai.String("none")}
 	default:
-		chatgpt.toolChoice = nil
+		chatgpt.toolChoice = openai.ChatCompletionToolChoiceOptionUnionParam{}
 	}
 }
 func (ai *ChatGPT) SetCount(i int64)         { ai.count = &i }
@@ -144,17 +138,18 @@ func (ai *ChatGPT) SetJSONResponse(set bool, schema *ai.JSONSchema) {
 			var format any
 			b, _ := json.Marshal(schema.Schema)
 			_ = json.Unmarshal(b, &format)
-			responseFormat = shared.ResponseFormatJSONSchemaParam{
-				Type: openai.F(shared.ResponseFormatJSONSchemaTypeJSONSchema),
-				JSONSchema: openai.F(shared.ResponseFormatJSONSchemaJSONSchemaParam{
-					Name:        openai.String(schema.Name),
-					Description: openai.String(schema.Description),
-					Schema:      openai.F(format),
-				}),
+			responseFormat = openai.ChatCompletionNewParamsResponseFormatUnion{
+				OfJSONSchema: &openai.ResponseFormatJSONSchemaParam{
+					JSONSchema: openai.ResponseFormatJSONSchemaJSONSchemaParam{
+						Name:        schema.Name,
+						Description: openai.String(schema.Description),
+						Schema:      format,
+					},
+				},
 			}
 		} else {
-			responseFormat = shared.ResponseFormatJSONObjectParam{
-				Type: openai.F(shared.ResponseFormatJSONObjectTypeJSONObject),
+			responseFormat = openai.ChatCompletionNewParamsResponseFormatUnion{
+				OfJSONObject: &openai.ResponseFormatJSONObjectParam{},
 			}
 		}
 	}
@@ -235,12 +230,14 @@ func (resp *ChatResponse[Response]) String() string {
 	return ""
 }
 
-func toImagePart(img ai.Image) openai.ChatCompletionContentPartImageParam {
-	return openai.ImagePart(string(img))
+func toImagePart(img ai.Image) []openai.ChatCompletionContentPartUnionParam {
+	return []openai.ChatCompletionContentPartUnionParam{openai.ImageContentPart(
+		openai.ChatCompletionContentPartImageImageURLParam{URL: string(img)},
+	)}
 }
 
-func fromImagePart(img openai.ChatCompletionContentPartImageParam) ai.Image {
-	return ai.Image(img.ImageURL.Value.URL.Value)
+func fromImagePart(img openai.ChatCompletionContentPartUnionParam) ai.Image {
+	return ai.Image(img.OfImageURL.ImageURL.URL)
 }
 
 func (c *ChatGPT) createRequest(
@@ -248,12 +245,12 @@ func (c *ChatGPT) createRequest(
 	history []openai.ChatCompletionMessageParamUnion,
 	messages ...ai.Part,
 ) (req openai.ChatCompletionNewParams) {
-	req.Model = openai.String(c.model)
-	if c.toolChoice != nil {
-		req.ToolChoice = openai.F(c.toolChoice)
+	req.Model = c.model
+	if !param.IsOmitted(c.toolChoice.OfAuto) {
+		req.ToolChoice = c.toolChoice
 	}
 	if len(c.tools) > 0 {
-		req.Tools = openai.F(c.tools)
+		req.Tools = c.tools
 	}
 	if c.maxTokens != nil {
 		req.MaxTokens = openai.Int(*c.maxTokens)
@@ -267,16 +264,13 @@ func (c *ChatGPT) createRequest(
 	if c.topP != nil {
 		req.TopP = openai.Float(*c.topP)
 	}
-	if c.json != nil {
-		req.ResponseFormat = openai.F(c.json)
+	if c.json.OfJSONObject != nil || c.json.OfJSONSchema != nil {
+		req.ResponseFormat = c.json
 	}
 	var msgs []openai.ChatCompletionMessageParamUnion
 	for _, i := range history {
-		switch v := i.(type) {
-		case openai.ChatCompletionMessage:
-			if len(v.ToolCalls) > 0 {
-				continue
-			}
+		if len(i.GetToolCalls()) > 0 {
+			continue
 		}
 		msgs = append(msgs, i)
 	}
@@ -285,14 +279,14 @@ func (c *ChatGPT) createRequest(
 		case ai.Text:
 			msgs = append(msgs, openai.UserMessage(string(v)))
 		case ai.Image:
-			msgs = append(msgs, openai.UserMessageParts(toImagePart(v)))
+			msgs = append(msgs, openai.UserMessage(toImagePart(v)))
 		case ai.Blob:
-			msgs = append(msgs, openai.UserMessageParts(toImagePart(ai.ImageData(v.MIMEType, v.Data))))
+			msgs = append(msgs, openai.UserMessage(toImagePart(ai.ImageData(v.MIMEType, v.Data))))
 		case ai.FunctionResponse:
 			msgs = append(msgs, openai.ToolMessage(v.ID, v.Response))
 		}
 	}
-	req.Messages = openai.F(msgs)
+	req.Messages = msgs
 	return
 }
 
@@ -343,8 +337,7 @@ func (cs *ChatStream) Next() (ai.ChatResponse, error) {
 					tc.Function.Arguments += i.Function.Arguments
 				} else {
 					cs.toolCalls[i.ID] = &openai.ChatCompletionMessageToolCall{
-						Type: openai.ChatCompletionMessageToolCallTypeFunction,
-						ID:   i.ID,
+						ID: i.ID,
 						Function: openai.ChatCompletionMessageToolCallFunction{
 							Name:      i.Function.Name,
 							Arguments: i.Function.Arguments,
@@ -360,15 +353,18 @@ func (cs *ChatStream) Next() (ai.ChatResponse, error) {
 		return nil, err
 	}
 	if cs.session != nil {
-		var toolCalls []openai.ChatCompletionMessageToolCall
+		var toolCalls []openai.ChatCompletionMessageToolCallParam
 		for _, i := range cs.toolCalls {
-			toolCalls = append(toolCalls, *i)
+			toolCalls = append(toolCalls, i.ToParam())
 		}
 		if cs.content != "" || len(toolCalls) > 0 {
-			cs.session.history = append(cs.session.history, openai.ChatCompletionMessage{
-				Content:   cs.content,
-				ToolCalls: toolCalls,
-				Role:      openai.ChatCompletionMessageRoleAssistant,
+			cs.session.history = append(cs.session.history, openai.ChatCompletionMessageParamUnion{
+				OfAssistant: &openai.ChatCompletionAssistantMessageParam{
+					Content: openai.ChatCompletionAssistantMessageParamContentUnion{
+						OfString: openai.String(cs.content),
+					},
+					ToolCalls: toolCalls,
+				},
 			})
 		}
 	}
@@ -414,9 +410,9 @@ func (session *ChatSession) addUserHistory(messages ...ai.Part) {
 		case ai.Text:
 			session.history = append(session.history, openai.UserMessage(string(v)))
 		case ai.Image:
-			session.history = append(session.history, openai.UserMessageParts(toImagePart(v)))
+			session.history = append(session.history, openai.UserMessage(toImagePart(v)))
 		case ai.Blob:
-			session.history = append(session.history, openai.UserMessageParts(toImagePart(ai.ImageData(v.MIMEType, v.Data))))
+			session.history = append(session.history, openai.UserMessage(toImagePart(ai.ImageData(v.MIMEType, v.Data))))
 		case ai.FunctionResponse:
 			session.history = append(session.history, openai.ToolMessage(v.ID, v.Response))
 		}
@@ -430,7 +426,7 @@ func (session *ChatSession) Chat(ctx context.Context, messages ...ai.Part) (ai.C
 	}
 	session.addUserHistory(messages...)
 	if len(resp.Choices) > 0 {
-		session.history = append(session.history, resp.Choices[0].Message)
+		session.history = append(session.history, resp.Choices[0].Message.ToParam())
 	}
 	return &ChatResponse[*openai.ChatCompletion]{resp}, nil
 }
@@ -446,31 +442,30 @@ func (session *ChatSession) ChatStream(ctx context.Context, messages ...ai.Part)
 
 func (session *ChatSession) History() (history []ai.Content) {
 	for _, i := range session.history {
-		switch v := i.(type) {
-		case openai.ChatCompletionMessage:
-			history = append(history, ai.Content{Role: string(v.Role), Parts: []ai.Part{ai.Text(v.Content)}})
-			for _, i := range v.ToolCalls {
-				history = append(history, ai.Content{Role: string(v.Role), Parts: []ai.Part{
-					ai.FunctionCall{ID: i.ID, Name: i.Function.Name, Arguments: i.Function.Arguments},
-				}})
+		if i.OfUser != nil {
+			if !param.IsOmitted(i.OfUser.Content.OfString) {
+				history = append(history, ai.Content{Role: "user", Parts: []ai.Part{ai.Text(i.OfUser.Content.OfString.Value)}})
+			} else if len(i.OfUser.Content.OfArrayOfContentParts) > 0 {
+				var parts []ai.Part
+				for _, i := range i.OfUser.Content.OfArrayOfContentParts {
+					parts = append(parts, fromImagePart(i))
+				}
+				history = append(history, ai.Content{Role: "user", Parts: parts})
 			}
-		case openai.ChatCompletionUserMessageParam:
-			var parts []ai.Part
-			for _, i := range v.Content.Value {
-				switch v := i.(type) {
-				case openai.ChatCompletionContentPartTextParam:
-					parts = append(parts, ai.Text(v.Text.Value))
-				case openai.ChatCompletionContentPartImageParam:
-					parts = append(parts, fromImagePart(v))
+		} else if i.OfAssistant != nil {
+			if !param.IsOmitted(i.OfAssistant.Content.OfString) {
+				history = append(history, ai.Content{Role: "assistant", Parts: []ai.Part{ai.Text(i.OfAssistant.Content.OfString.Value)}})
+			} else if tools := i.OfAssistant.ToolCalls; len(tools) > 0 {
+				for _, i := range tools {
+					history = append(history, ai.Content{Role: "assistant", Parts: []ai.Part{
+						ai.FunctionCall{ID: i.ID, Name: i.Function.Name, Arguments: i.Function.Arguments},
+					}})
 				}
 			}
-			history = append(history, ai.Content{Role: "user", Parts: parts})
-		case openai.ChatCompletionToolMessageParam:
-			for _, i := range v.Content.Value {
-				history = append(history, ai.Content{Role: "tool", Parts: []ai.Part{
-					ai.FunctionResponse{ID: v.ToolCallID.Value, Response: i.Text.Value},
-				}})
-			}
+		} else if i.OfTool != nil {
+			history = append(history, ai.Content{Role: "tool", Parts: []ai.Part{
+				ai.FunctionResponse{ID: i.OfTool.ToolCallID, Response: i.OfTool.Content.OfString.Value},
+			}})
 		}
 	}
 	return
