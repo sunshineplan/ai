@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"maps"
 	"math"
 	"net/http"
 	"net/url"
@@ -287,7 +288,7 @@ func (c *ChatGPT) createRequest(
 		case ai.Blob:
 			msgs = append(msgs, openai.UserMessage(toImagePart(ai.ImageData(v.MIMEType, v.Data))))
 		case ai.FunctionResponse:
-			msgs = append(msgs, openai.ToolMessage(v.ID, v.Response))
+			msgs = append(msgs, openai.ToolMessage(v.Response, v.ID))
 		}
 	}
 	req.Messages = msgs
@@ -324,7 +325,7 @@ type ChatStream struct {
 	stream    *ssestream.Stream[openai.ChatCompletionChunk]
 	session   *ChatSession
 	content   string
-	toolCalls map[string]*openai.ChatCompletionMessageToolCall
+	toolCalls map[string]*openai.ChatCompletionMessageToolCallParam
 }
 
 func (cs *ChatStream) Next() (ai.ChatResponse, error) {
@@ -334,15 +335,15 @@ func (cs *ChatStream) Next() (ai.ChatResponse, error) {
 			cs.content += resp.Choices[0].Delta.Content
 			for _, i := range resp.Choices[0].Delta.ToolCalls {
 				if cs.toolCalls == nil {
-					cs.toolCalls = make(map[string]*openai.ChatCompletionMessageToolCall)
+					cs.toolCalls = make(map[string]*openai.ChatCompletionMessageToolCallParam)
 				}
 				if tc, ok := cs.toolCalls[i.ID]; ok {
 					tc.Function.Name += i.Function.Name
 					tc.Function.Arguments += i.Function.Arguments
 				} else {
-					cs.toolCalls[i.ID] = &openai.ChatCompletionMessageToolCall{
+					cs.toolCalls[i.ID] = &openai.ChatCompletionMessageToolCallParam{
 						ID: i.ID,
-						Function: openai.ChatCompletionMessageToolCallFunction{
+						Function: openai.ChatCompletionMessageToolCallFunctionParam{
 							Name:      i.Function.Name,
 							Arguments: i.Function.Arguments,
 						},
@@ -358,8 +359,8 @@ func (cs *ChatStream) Next() (ai.ChatResponse, error) {
 	}
 	if cs.session != nil {
 		var toolCalls []openai.ChatCompletionMessageToolCallParam
-		for _, i := range cs.toolCalls {
-			toolCalls = append(toolCalls, i.ToParam())
+		for i := range maps.Values(cs.toolCalls) {
+			toolCalls = append(toolCalls, *i)
 		}
 		if cs.content != "" || len(toolCalls) > 0 {
 			cs.session.history = append(cs.session.history, openai.ChatCompletionMessageParamUnion{
@@ -447,9 +448,10 @@ func (session *ChatSession) ChatStream(ctx context.Context, messages ...ai.Part)
 func (session *ChatSession) History() (history []ai.Content) {
 	for _, i := range session.history {
 		if i.OfUser != nil {
-			if !param.IsOmitted(i.OfUser.Content.OfString) {
-				history = append(history, ai.Content{Role: "user", Parts: []ai.Part{ai.Text(i.OfUser.Content.OfString.Value)}})
-			} else if len(i.OfUser.Content.OfArrayOfContentParts) > 0 {
+			if v := i.OfUser.Content.OfString.Value; v != "" {
+				history = append(history, ai.Content{Role: "user", Parts: []ai.Part{ai.Text(v)}})
+			}
+			if len(i.OfUser.Content.OfArrayOfContentParts) > 0 {
 				var parts []ai.Part
 				for _, i := range i.OfUser.Content.OfArrayOfContentParts {
 					parts = append(parts, fromImagePart(i))
@@ -457,9 +459,10 @@ func (session *ChatSession) History() (history []ai.Content) {
 				history = append(history, ai.Content{Role: "user", Parts: parts})
 			}
 		} else if i.OfAssistant != nil {
-			if !param.IsOmitted(i.OfAssistant.Content.OfString) {
-				history = append(history, ai.Content{Role: "assistant", Parts: []ai.Part{ai.Text(i.OfAssistant.Content.OfString.Value)}})
-			} else if tools := i.OfAssistant.ToolCalls; len(tools) > 0 {
+			if v := i.OfAssistant.Content.OfString.Value; v != "" {
+				history = append(history, ai.Content{Role: "assistant", Parts: []ai.Part{ai.Text(v)}})
+			}
+			if tools := i.OfAssistant.ToolCalls; len(tools) > 0 {
 				for _, i := range tools {
 					history = append(history, ai.Content{Role: "assistant", Parts: []ai.Part{
 						ai.FunctionCall{ID: i.ID, Name: i.Function.Name, Arguments: i.Function.Arguments},
