@@ -174,11 +174,15 @@ func (resp *ChatResponse[Response]) Results() (res []string) {
 	switch v := any(resp.resp).(type) {
 	case *openai.ChatCompletion:
 		for _, i := range v.Choices {
-			res = append(res, i.Message.Content)
+			if i.Message.Content != "" {
+				res = append(res, i.Message.Content)
+			}
 		}
 	case openai.ChatCompletionChunk:
 		for _, i := range v.Choices {
-			res = append(res, i.Delta.Content)
+			if i.Delta.Content != "" {
+				res = append(res, i.Delta.Content)
+			}
 		}
 	}
 	return
