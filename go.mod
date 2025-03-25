@@ -3,7 +3,7 @@ module github.com/sunshineplan/ai
 go 1.24
 
 require (
-	github.com/anthropics/anthropic-sdk-go v0.2.0-alpha.13
+	github.com/anthropics/anthropic-sdk-go v0.2.0-beta.2
 	github.com/google/generative-ai-go v0.19.0
 	github.com/openai/openai-go v0.1.0-beta.2
 	github.com/sunshineplan/workers v1.0.4
