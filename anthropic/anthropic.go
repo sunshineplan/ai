@@ -16,6 +16,7 @@ import (
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
+	"github.com/anthropics/anthropic-sdk-go/packages/param"
 	"github.com/anthropics/anthropic-sdk-go/packages/ssestream"
 	"golang.org/x/time/rate"
 )
@@ -30,7 +31,7 @@ type Anthropic struct {
 	*anthropic.Client
 	model       string
 	toolChoice  anthropic.ToolChoiceUnionParam
-	tools       []anthropic.ToolUnionUnionParam
+	tools       []anthropic.ToolUnionParam
 	maxTokens   *int64
 	temperature *float64
 	topP        *float64
@@ -68,14 +69,11 @@ func New(opts ...ai.ClientOption) (ai.AI, error) {
 	return c, nil
 }
 
-func NewWithClient(client *anthropic.Client, model string) ai.AI {
-	if client == nil {
-		panic("cannot create AI from nil client")
-	}
+func NewWithClient(client anthropic.Client, model string) ai.AI {
 	if model == "" {
 		model = defaultModel
 	}
-	return &Anthropic{Client: client, model: model}
+	return &Anthropic{Client: &client, model: model}
 }
 
 func (Anthropic) LLMs() ai.LLMs {
@@ -107,29 +105,29 @@ func (ai *Anthropic) wait(ctx context.Context) error {
 func (ai *Anthropic) SetModel(model string) { ai.model = model }
 func (a *Anthropic) SetFunctionCall(f []ai.Function, mode ai.FunctionCallingMode) {
 	if a.tools = nil; len(f) == 0 {
-		a.toolChoice = nil
+		a.toolChoice = anthropic.ToolChoiceUnionParam{}
 		return
 	}
 	for _, i := range f {
-		a.tools = append(a.tools, anthropic.ToolParam{
-			Name:        anthropic.String(i.Name),
-			Description: anthropic.String(i.Description),
-			InputSchema: anthropic.F[any](i.Parameters),
+		a.tools = append(a.tools, anthropic.ToolUnionParam{
+			OfTool: &anthropic.ToolParam{
+				Name:        i.Name,
+				Description: anthropic.String(i.Description),
+				InputSchema: anthropic.ToolInputSchemaParam{
+					Properties: i.Parameters,
+				},
+			},
 		})
 	}
 	switch mode {
 	case ai.FunctionCallingAuto:
-		a.toolChoice = anthropic.ToolChoiceAutoParam{Type: anthropic.F(anthropic.ToolChoiceAutoTypeAuto)}
+		a.toolChoice = anthropic.ToolChoiceUnionParam{OfToolChoiceAuto: &anthropic.ToolChoiceAutoParam{}}
 	case ai.FunctionCallingAny:
-		a.toolChoice = anthropic.ToolChoiceAnyParam{Type: anthropic.F(anthropic.ToolChoiceAnyTypeAny)}
+		a.toolChoice = anthropic.ToolChoiceUnionParam{OfToolChoiceAny: &anthropic.ToolChoiceAnyParam{}}
 	case ai.FunctionCallingNone:
-		a.toolChoice = anthropic.ToolChoiceToolParam{
-			Type:                   anthropic.F(anthropic.ToolChoiceToolTypeTool),
-			Name:                   anthropic.String("none"),
-			DisableParallelToolUse: anthropic.Bool(true),
-		}
+		a.toolChoice = anthropic.ToolChoiceUnionParam{OfToolChoiceNone: &anthropic.ToolChoiceNoneParam{}}
 	default:
-		a.toolChoice = nil
+		a.toolChoice = anthropic.ToolChoiceUnionParam{}
 	}
 }
 func (ai *Anthropic) SetMaxTokens(i int64)     { ai.maxTokens = &i }
@@ -146,7 +144,7 @@ func (ai *Anthropic) SetJSONResponse(_ bool, _ *ai.JSONSchema) {
 var _ ai.ChatResponse = new(ChatResponse[*anthropic.Message])
 
 type ChatCompletionResponse interface {
-	*anthropic.Message | anthropic.MessageStreamEvent
+	*anthropic.Message | anthropic.MessageStreamEventUnion
 }
 
 type ChatResponse[Response ChatCompletionResponse] struct {
@@ -161,16 +159,14 @@ func (resp *ChatResponse[Response]) Results() (res []string) {
 	switch v := any(resp.resp).(type) {
 	case *anthropic.Message:
 		for _, i := range v.Content {
-			if v, ok := i.AsUnion().(anthropic.TextBlock); ok {
+			if v, ok := i.AsAny().(anthropic.TextBlock); ok {
 				res = append(res, v.Text)
 			}
 		}
-	case anthropic.MessageStreamEvent:
-		switch v := v.Delta.(type) {
-		case anthropic.MessageDeltaEventDelta:
-			// ignored
-		case anthropic.ContentBlockDeltaEventDelta:
-			if v, ok := v.AsUnion().(anthropic.TextDelta); ok {
+	case anthropic.MessageStreamEventUnion:
+		switch v := v.AsAny().(type) {
+		case anthropic.ContentBlockDeltaEvent:
+			if v, ok := v.Delta.AsAny().(anthropic.TextDelta); ok {
 				if v.Text != "" {
 					res = append(res, v.Text)
 				}
@@ -184,26 +180,21 @@ func (resp *ChatResponse[Response]) FunctionCalls() (res []ai.FunctionCall) {
 	switch v := any(resp.resp).(type) {
 	case *anthropic.Message:
 		for _, i := range v.Content {
-			if v, ok := i.AsUnion().(anthropic.ToolUseBlock); ok {
+			if v, ok := i.AsAny().(anthropic.ToolUseBlock); ok {
 				res = append(res, ai.FunctionCall{ID: v.ID, Name: v.Name, Arguments: string(v.Input)})
 			}
 		}
-	case anthropic.MessageStreamEvent:
-		switch v := v.Delta.(type) {
-		case anthropic.MessageDeltaEventDelta:
-			// ignored
-		case anthropic.ContentBlockDeltaEventDelta:
-			if v, ok := v.AsUnion().(anthropic.InputJSONDelta); ok {
+	case anthropic.MessageStreamEventUnion:
+		switch v := v.AsAny().(type) {
+		case anthropic.ContentBlockDeltaEvent:
+			if v, ok := v.Delta.AsAny().(anthropic.InputJSONDelta); ok {
 				if v.PartialJSON != "" {
 					res = append(res, ai.FunctionCall{Arguments: v.PartialJSON})
 				}
 			}
 		}
-		switch v := v.ContentBlock.(type) {
-		case anthropic.ContentBlockStartEventContentBlock:
-			if v, ok := v.AsUnion().(anthropic.ToolUseBlock); ok {
-				res = append(res, ai.FunctionCall{ID: v.ID, Name: v.Name, Arguments: string(v.Input)})
-			}
+		if v, ok := v.ContentBlock.AsAny().(anthropic.ToolUseBlock); ok {
+			res = append(res, ai.FunctionCall{ID: v.ID, Name: v.Name, Arguments: string(v.Input)})
 		}
 	}
 	return
@@ -214,7 +205,7 @@ func (resp *ChatResponse[Response]) TokenCount() (res ai.TokenCount) {
 	case *anthropic.Message:
 		res.Prompt = v.Usage.InputTokens
 		res.Result = v.Usage.OutputTokens
-	case anthropic.MessageStreamEvent:
+	case anthropic.MessageStreamEventUnion:
 		res.Prompt = v.Message.Usage.InputTokens
 		res.Result = v.Message.Usage.OutputTokens
 	}
@@ -236,38 +227,39 @@ func (resp *ChatResponse[Response]) String() string {
 	return ""
 }
 
-func toImageBlock(img ai.Image) anthropic.ImageBlockParam {
+func toImageBlock(img ai.Image) anthropic.ContentBlockParamUnion {
 	mime, data := img.Data()
 	return anthropic.NewImageBlockBase64(mime, base64.StdEncoding.EncodeToString(data))
 }
 
-func fromImageBlockSource(src anthropic.ImageBlockParamSourceUnion) ai.Image {
-	switch v := src.(type) {
-	case anthropic.ImageBlockParamSource:
-		b, err := base64.StdEncoding.DecodeString(v.Data.Value)
+func fromImageBlockSource(img anthropic.ImageBlockParamSourceUnion) ai.Image {
+	if src := img.OfBase64ImageSource; src != nil {
+		b, err := base64.StdEncoding.DecodeString(src.Data)
 		if err != nil {
 			panic(err)
 		}
-		return ai.ImageData(v.MediaType.String(), b)
+		return ai.ImageData(string(src.MediaType), b)
+	} else if src := img.OfURLImageSource; src != nil {
+		return ai.Image(src.URL)
 	}
-	panic(fmt.Sprintf("unsupported image block source type: %T", src))
+	panic(fmt.Sprintf("bad image: %v", img))
 }
 
 func (c *Anthropic) createRequest(
 	history []anthropic.MessageParam,
 	messages ...ai.Part,
 ) (req anthropic.MessageNewParams) {
-	req.Model = anthropic.String(c.model)
-	if c.toolChoice != nil {
-		req.ToolChoice = anthropic.F(c.toolChoice)
+	req.Model = c.model
+	if !param.IsOmitted(c.toolChoice) {
+		req.ToolChoice = c.toolChoice
 	}
 	if len(c.tools) > 0 {
-		req.Tools = anthropic.F(c.tools)
+		req.Tools = c.tools
 	}
 	if c.maxTokens != nil {
-		req.MaxTokens = anthropic.Int(*c.maxTokens)
+		req.MaxTokens = *c.maxTokens
 	} else {
-		req.MaxTokens = anthropic.Int(DefaultMaxTokens)
+		req.MaxTokens = DefaultMaxTokens
 	}
 	if c.temperature != nil {
 		req.Temperature = anthropic.Float(*c.temperature)
@@ -277,13 +269,17 @@ func (c *Anthropic) createRequest(
 	}
 	var msgs []anthropic.MessageParam
 	for _, i := range history {
-		for _, v := range i.Content.Value {
-			switch v.(type) {
-			case anthropic.ToolUseBlockParam:
+		var content []anthropic.ContentBlockParamUnion
+		for _, v := range i.Content {
+			if v.OfRequestToolUseBlock != nil {
 				continue
 			}
+			content = append(content, v)
 		}
-		msgs = append(msgs, i)
+		msgs = append(msgs, anthropic.MessageParam{
+			Role:    i.Role,
+			Content: content,
+		})
 	}
 	for _, i := range messages {
 		switch v := i.(type) {
@@ -297,7 +293,7 @@ func (c *Anthropic) createRequest(
 			msgs = append(msgs, anthropic.NewUserMessage(anthropic.NewToolResultBlock(v.ID, v.Response, false)))
 		}
 	}
-	req.Messages = anthropic.F(msgs)
+	req.Messages = msgs
 	return
 }
 
@@ -327,63 +323,28 @@ func (ai *Anthropic) Chat(ctx context.Context, messages ...ai.Part) (ai.ChatResp
 var _ ai.ChatStream = new(ChatStream)
 
 type ChatStream struct {
-	stream    *ssestream.Stream[anthropic.MessageStreamEvent]
-	session   *ChatSession
-	content   string
-	current   *ai.FunctionCall
-	toolCalls map[*ai.FunctionCall]string
+	stream  *ssestream.Stream[anthropic.MessageStreamEventUnion]
+	session *ChatSession
+	message anthropic.Message
 }
 
 func (cs *ChatStream) Next() (ai.ChatResponse, error) {
 	if cs.stream.Next() {
 		resp := cs.stream.Current()
 		if cs.session != nil {
-			if resp.Delta != nil {
-				switch v := resp.Delta.(type) {
-				case anthropic.MessageDeltaEventDelta:
-					// ignored
-				case anthropic.ContentBlockDeltaEventDelta:
-					switch v.Type {
-					case anthropic.ContentBlockDeltaEventDeltaTypeTextDelta:
-						cs.content += v.Text
-					case anthropic.ContentBlockDeltaEventDeltaTypeInputJSONDelta:
-						if cs.toolCalls == nil {
-							cs.toolCalls = make(map[*ai.FunctionCall]string)
-						}
-						cs.toolCalls[cs.current] += v.PartialJSON
-					}
-				}
-			}
-			if resp.ContentBlock != nil {
-				switch v := resp.ContentBlock.(type) {
-				case anthropic.ContentBlockStartEventContentBlock:
-					switch v.Type {
-					case anthropic.ContentBlockStartEventContentBlockTypeText:
-						cs.content += v.Text
-					case anthropic.ContentBlockStartEventContentBlockTypeToolUse:
-						cs.current = &ai.FunctionCall{ID: v.ID, Name: v.Name}
-					}
-				}
+			err := cs.message.Accumulate(resp)
+			if err != nil {
+				return nil, err
 			}
 		}
-		return &ChatResponse[anthropic.MessageStreamEvent]{resp}, nil
+		return &ChatResponse[anthropic.MessageStreamEventUnion]{resp}, nil
 	}
 	if err := cs.stream.Err(); err != nil {
-		cs.content = ""
+		cs.message = anthropic.Message{}
 		return nil, err
 	}
 	if cs.session != nil {
-		if cs.content != "" {
-			cs.session.history = append(cs.session.history, anthropic.NewAssistantMessage(anthropic.NewTextBlock(cs.content)))
-		}
-		if len(cs.toolCalls) > 0 {
-			for k, v := range cs.toolCalls {
-				cs.session.history = append(
-					cs.session.history,
-					anthropic.NewAssistantMessage(anthropic.NewToolUseBlockParam(k.ID, k.Name, v)),
-				)
-			}
-		}
+		cs.session.history = append(cs.session.history, cs.message.ToParam())
 	}
 	return nil, io.EOF
 }
@@ -396,7 +357,7 @@ func (anthropic *Anthropic) chatStream(
 	ctx context.Context,
 	history []anthropic.MessageParam,
 	messages ...ai.Part,
-) (*ssestream.Stream[anthropic.MessageStreamEvent], error) {
+) (*ssestream.Stream[anthropic.MessageStreamEventUnion], error) {
 	if anthropic.Client == nil {
 		return nil, ai.ErrAIClosed
 	}
@@ -411,7 +372,7 @@ func (ai *Anthropic) ChatStream(ctx context.Context, messages ...ai.Part) (ai.Ch
 	if err != nil {
 		return nil, err
 	}
-	return &ChatStream{stream, nil, "", nil, nil}, nil
+	return &ChatStream{stream: stream}, nil
 }
 
 var _ ai.ChatSession = new(ChatSession)
@@ -452,34 +413,39 @@ func (session *ChatSession) ChatStream(ctx context.Context, messages ...ai.Part)
 		return nil, err
 	}
 	session.addUserHistory(messages...)
-	return &ChatStream{stream, session, "", nil, nil}, nil
+	return &ChatStream{stream: stream, session: session}, nil
 }
 
 func (session *ChatSession) History() (history []ai.Content) {
 	for _, i := range session.history {
-		for _, v := range i.Content.Value {
-			switch v := v.(type) {
-			case anthropic.TextBlockParam:
-				history = append(history, ai.Content{Role: i.Role.String(), Parts: []ai.Part{ai.Text(v.Text.Value)}})
-			case anthropic.ImageBlockParam:
-				history = append(history, ai.Content{Role: i.Role.String(), Parts: []ai.Part{fromImageBlockSource(v.Source.Value)}})
-			case anthropic.ToolUseBlockParam:
-				args, err := json.Marshal(v.Input.Value)
+		for _, v := range i.Content {
+			if v.OfRequestTextBlock != nil {
+				if text := v.OfRequestTextBlock.Text; text != "" {
+					history = append(history, ai.Content{Role: string(i.Role), Parts: []ai.Part{ai.Text(text)}})
+				}
+			}
+			if v.OfRequestImageBlock != nil {
+				history = append(history, ai.Content{Role: string(i.Role), Parts: []ai.Part{
+					fromImageBlockSource(v.OfRequestImageBlock.Source),
+				}})
+			}
+			if v.OfRequestToolUseBlock != nil {
+				args, err := json.Marshal(v.OfRequestToolUseBlock.Input)
 				if err != nil {
 					panic(err)
 				}
-				history = append(history, ai.Content{Role: i.Role.String(), Parts: []ai.Part{ai.FunctionCall{
-					ID:        v.ID.Value,
-					Name:      v.Name.Value,
+				history = append(history, ai.Content{Role: string(i.Role), Parts: []ai.Part{ai.FunctionCall{
+					ID:        v.OfRequestToolUseBlock.ID,
+					Name:      v.OfRequestToolUseBlock.Name,
 					Arguments: string(args),
 				}}})
-			case anthropic.ToolResultBlockParam:
-				for _, ii := range v.Content.Value {
-					switch vv := ii.(type) {
-					case anthropic.TextBlockParam:
-						history = append(history, ai.Content{Role: i.Role.String(), Parts: []ai.Part{ai.FunctionResponse{
-							ID:       v.ToolUseID.Value,
-							Response: vv.Text.Value,
+			}
+			if v.OfRequestToolResultBlock != nil {
+				for _, ii := range v.OfRequestToolResultBlock.Content {
+					if ii.OfRequestTextBlock != nil {
+						history = append(history, ai.Content{Role: string(i.Role), Parts: []ai.Part{ai.FunctionResponse{
+							ID:       v.OfRequestToolResultBlock.ToolUseID,
+							Response: ii.OfRequestTextBlock.Text,
 						}}})
 					}
 				}
