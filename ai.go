@@ -26,7 +26,7 @@ type AI interface {
 
 type Schema struct {
 	Type       string         `json:"type"`
-	Properties map[string]any `json:"properties"`
+	Properties map[string]any `json:"properties,omitempty"`
 	Enum       []string       `json:"enum,omitempty"`
 	Items      *Schema        `json:"items,omitempty"`
 	Required   []string       `json:"required,omitempty"`
