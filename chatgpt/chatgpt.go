@@ -79,8 +79,8 @@ func (ChatGPT) LLMs() ai.LLMs {
 	return ai.ChatGPT
 }
 
-func (chatgpt *ChatGPT) Model(_ context.Context) (string, error) {
-	return chatgpt.model, nil
+func (chatgpt *ChatGPT) Model() string {
+	return chatgpt.model
 }
 
 func (chatgpt *ChatGPT) SetLimit(rpm int64) {

@@ -4,14 +4,14 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/google/generative-ai-go/genai"
+	"google.golang.org/genai"
 )
 
 type schema struct {
 	Type        string
 	Format      string
 	Description string
-	Nullable    bool
+	Nullable    *bool
 	Enum        []string
 	Items       *schema
 	Properties  map[string]*schema

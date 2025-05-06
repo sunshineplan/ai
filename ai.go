@@ -11,7 +11,7 @@ var ErrAIClosed = errors.New("AI client is nil or already closed")
 
 type AI interface {
 	LLMs() LLMs
-	Model(context.Context) (string, error)
+	Model() string
 
 	Limiter
 
