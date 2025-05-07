@@ -3,8 +3,8 @@ package gemini
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
+	"iter"
 	"math"
 	"net/http"
 	"net/url"
@@ -13,10 +13,8 @@ import (
 
 	"github.com/sunshineplan/ai"
 
-	"github.com/google/generative-ai-go/genai"
 	"golang.org/x/time/rate"
-	"google.golang.org/api/iterator"
-	"google.golang.org/api/option"
+	"google.golang.org/genai"
 )
 
 const defaultModel = "gemini-2.0-flash"
@@ -25,8 +23,8 @@ var _ ai.AI = new(Gemini)
 
 type Gemini struct {
 	*genai.Client
-	model  *genai.GenerativeModel
-	config genai.GenerationConfig
+	model  string
+	config *genai.GenerateContentConfig
 
 	limiter *rate.Limiter
 }
@@ -36,10 +34,8 @@ func New(ctx context.Context, opts ...ai.ClientOption) (ai.AI, error) {
 	for _, i := range opts {
 		i.Apply(cfg)
 	}
-	var o []option.ClientOption
-	if cfg.Proxy == "" {
-		o = append(o, option.WithAPIKey(cfg.APIKey))
-	} else {
+	cc := &genai.ClientConfig{APIKey: cfg.APIKey}
+	if cfg.Proxy != "" {
 		u, err := url.Parse(cfg.Proxy)
 		if err != nil {
 			return nil, err
@@ -47,13 +43,13 @@ func New(ctx context.Context, opts ...ai.ClientOption) (ai.AI, error) {
 		if t, ok := http.DefaultTransport.(*http.Transport); ok {
 			t = t.Clone()
 			t.Proxy = http.ProxyURL(u)
-			o = append(o, option.WithHTTPClient(&http.Client{Transport: &apikey{cfg.APIKey, t}}))
+			cc.HTTPClient = &http.Client{Transport: t}
 		}
 	}
 	if cfg.Endpoint != "" {
-		o = append(o, option.WithEndpoint(cfg.Endpoint))
+		cc.HTTPOptions.BaseURL = cfg.Endpoint
 	}
-	client, err := genai.NewClient(ctx, o...)
+	client, err := genai.NewClient(ctx, cc)
 	if err != nil {
 		return nil, err
 	}
@@ -69,19 +65,15 @@ func NewWithClient(client *genai.Client, model string) ai.AI {
 	if model == "" {
 		model = defaultModel
 	}
-	return &Gemini{Client: client, model: client.GenerativeModel(model)}
+	return &Gemini{Client: client, model: model, config: new(genai.GenerateContentConfig)}
 }
 
 func (Gemini) LLMs() ai.LLMs {
 	return ai.Gemini
 }
 
-func (gemini *Gemini) Model(ctx context.Context) (string, error) {
-	info, err := gemini.model.Info(ctx)
-	if err != nil {
-		return "", err
-	}
-	return info.Name, nil
+func (gemini *Gemini) Model() string {
+	return gemini.model
 }
 
 func (gemini *Gemini) SetLimit(rpm int64) {
@@ -103,8 +95,7 @@ func (ai *Gemini) wait(ctx context.Context) error {
 }
 
 func (ai *Gemini) SetModel(model string) {
-	ai.model = ai.GenerativeModel(model)
-	ai.model.GenerationConfig = ai.config
+	ai.model = model
 }
 
 func genaiSchema(schema *ai.Schema) (*genai.Schema, error) {
@@ -139,8 +130,8 @@ func genaiSchema(schema *ai.Schema) (*genai.Schema, error) {
 
 func (gemini *Gemini) SetFunctionCall(f []ai.Function, mode ai.FunctionCallingMode) {
 	if len(f) == 0 {
-		gemini.model.Tools = nil
-		gemini.model.ToolConfig = nil
+		gemini.config.Tools = nil
+		gemini.config.ToolConfig = nil
 		return
 	}
 	var declarations []*genai.FunctionDeclaration
@@ -155,40 +146,28 @@ func (gemini *Gemini) SetFunctionCall(f []ai.Function, mode ai.FunctionCallingMo
 			Parameters:  schema,
 		})
 	}
-	gemini.model.Tools = []*genai.Tool{{FunctionDeclarations: declarations}}
+	gemini.config.Tools = []*genai.Tool{{FunctionDeclarations: declarations}}
 	switch mode {
 	case ai.FunctionCallingAuto:
-		gemini.model.ToolConfig = &genai.ToolConfig{
-			FunctionCallingConfig: &genai.FunctionCallingConfig{Mode: genai.FunctionCallingAuto},
+		gemini.config.ToolConfig = &genai.ToolConfig{
+			FunctionCallingConfig: &genai.FunctionCallingConfig{Mode: genai.FunctionCallingConfigModeAuto},
 		}
 	case ai.FunctionCallingAny:
-		gemini.model.ToolConfig = &genai.ToolConfig{
-			FunctionCallingConfig: &genai.FunctionCallingConfig{Mode: genai.FunctionCallingAny},
+		gemini.config.ToolConfig = &genai.ToolConfig{
+			FunctionCallingConfig: &genai.FunctionCallingConfig{Mode: genai.FunctionCallingConfigModeAny},
 		}
 	case ai.FunctionCallingNone:
-		gemini.model.ToolConfig = &genai.ToolConfig{
-			FunctionCallingConfig: &genai.FunctionCallingConfig{Mode: genai.FunctionCallingNone},
+		gemini.config.ToolConfig = &genai.ToolConfig{
+			FunctionCallingConfig: &genai.FunctionCallingConfig{Mode: genai.FunctionCallingConfigModeNone},
 		}
 	default:
-		gemini.model.ToolConfig = nil
+		gemini.config.ToolConfig = nil
 	}
 }
-func (ai *Gemini) SetCount(i int64) {
-	ai.config.SetCandidateCount(int32(i))
-	ai.model.GenerationConfig = ai.config
-}
-func (ai *Gemini) SetMaxTokens(i int64) {
-	ai.config.SetMaxOutputTokens(int32(i))
-	ai.model.GenerationConfig = ai.config
-}
-func (ai *Gemini) SetTemperature(f float64) {
-	ai.config.SetTemperature(float32(f))
-	ai.model.GenerationConfig = ai.config
-}
-func (ai *Gemini) SetTopP(f float64) {
-	ai.config.SetTopP(float32(f))
-	ai.model.GenerationConfig = ai.config
-}
+func (ai *Gemini) SetCount(i int64)         { ai.config.CandidateCount = int32(i) }
+func (ai *Gemini) SetMaxTokens(i int64)     { ai.config.MaxOutputTokens = int32(i) }
+func (ai *Gemini) SetTemperature(f float64) { ai.config.Temperature = genai.Ptr(float32(f)) }
+func (ai *Gemini) SetTopP(f float64)        { ai.config.TopP = genai.Ptr(float32(f)) }
 func (ai *Gemini) SetJSONResponse(set bool, schema *ai.JSONSchema) {
 	if set {
 		ai.config.ResponseMIMEType = "application/json"
@@ -201,19 +180,18 @@ func (ai *Gemini) SetJSONResponse(set bool, schema *ai.JSONSchema) {
 		ai.config.ResponseMIMEType = "text/plain"
 		ai.config.ResponseSchema = nil
 	}
-	ai.model.GenerationConfig = ai.config
 }
 
-func toParts(src []ai.Part) (dst []genai.Part) {
+func toParts(src []ai.Part) (dst []*genai.Part) {
 	for _, i := range src {
 		switch v := i.(type) {
 		case ai.Text:
-			dst = append(dst, genai.Text(v))
+			dst = append(dst, genai.NewPartFromText(string(v)))
 		case ai.Image:
 			mime, data := v.Data()
-			dst = append(dst, genai.Blob{MIMEType: mime, Data: data})
+			dst = append(dst, genai.NewPartFromBytes(data, mime))
 		case ai.Blob:
-			dst = append(dst, genai.Blob(v))
+			dst = append(dst, genai.NewPartFromBytes(v.Data, v.MIMEType))
 		case ai.FunctionCall:
 			b, err := json.Marshal(v.Arguments)
 			if err != nil {
@@ -223,37 +201,44 @@ func toParts(src []ai.Part) (dst []genai.Part) {
 			if err := json.Unmarshal(b, &args); err != nil {
 				panic(err)
 			}
-			dst = append(dst, genai.FunctionCall{Name: v.ID, Args: args})
+			dst = append(dst, genai.NewPartFromFunctionCall(v.Name, args))
 		case ai.FunctionResponse:
 			var resp map[string]any
 			if err := json.Unmarshal([]byte(v.Response), &resp); err != nil {
 				panic(err)
 			}
-			dst = append(dst, genai.FunctionResponse{Name: v.ID, Response: resp})
+			dst = append(dst, genai.NewPartFromFunctionResponse(v.ID, resp))
 		}
 	}
 	return
 }
 
-func fromParts(src []genai.Part) (dst []ai.Part) {
+func fromParts(src []*genai.Part) (dst []ai.Part) {
 	for _, i := range src {
-		switch v := i.(type) {
-		case genai.Text:
-			dst = append(dst, ai.Text(v))
-		case genai.Blob:
-			dst = append(dst, ai.Blob(v))
-		case genai.FunctionCall:
-			b, err := json.Marshal(v.Args)
+		if i.Text != "" {
+			dst = append(dst, ai.Text(i.Text))
+		} else if i.InlineData != nil {
+			dst = append(dst, ai.Blob{MIMEType: i.InlineData.MIMEType, Data: i.InlineData.Data})
+		} else if i.FunctionCall != nil {
+			b, err := json.Marshal(i.FunctionCall.Args)
 			if err != nil {
 				panic(err)
 			}
-			dst = append(dst, ai.FunctionCall{ID: v.Name, Name: v.Name, Arguments: string(b)})
-		case genai.FunctionResponse:
-			b, err := json.Marshal(v.Response)
+			id := i.FunctionCall.ID
+			if id == "" {
+				id = i.FunctionCall.Name
+			}
+			dst = append(dst, ai.FunctionCall{ID: id, Name: i.FunctionCall.Name, Arguments: string(b)})
+		} else if i.FunctionResponse != nil {
+			b, err := json.Marshal(i.FunctionResponse.Response)
 			if err != nil {
 				panic(err)
 			}
-			dst = append(dst, ai.FunctionResponse{ID: v.Name, Response: string(b)})
+			id := i.FunctionResponse.ID
+			if id == "" {
+				id = i.FunctionResponse.Name
+			}
+			dst = append(dst, ai.FunctionResponse{ID: id, Response: string(b)})
 		}
 	}
 	return
@@ -274,8 +259,8 @@ func (resp *ChatResponse) Results() (res []string) {
 		if i.Content != nil {
 			var s []string
 			for _, i := range i.Content.Parts {
-				if v, ok := i.(genai.Text); ok {
-					s = append(s, string(v))
+				if i.Text != "" {
+					s = append(s, i.Text)
 				}
 			}
 			res = append(res, strings.Join(s, "\n"))
@@ -288,12 +273,16 @@ func (resp *ChatResponse) FunctionCalls() (res []ai.FunctionCall) {
 	for _, i := range resp.Candidates {
 		if i.Content != nil {
 			for _, i := range i.Content.Parts {
-				if v, ok := i.(genai.FunctionCall); ok {
-					b, err := json.Marshal(v.Args)
+				if i.FunctionCall != nil {
+					b, err := json.Marshal(i.FunctionCall.Args)
 					if err != nil {
 						panic(err)
 					}
-					res = append(res, ai.FunctionCall{ID: v.Name, Name: v.Name, Arguments: string(b)})
+					id := i.FunctionCall.ID
+					if id == "" {
+						id = i.FunctionCall.Name
+					}
+					res = append(res, ai.FunctionCall{ID: id, Name: i.FunctionCall.Name, Arguments: string(b)})
 				}
 			}
 		}
@@ -328,7 +317,12 @@ func (ai *Gemini) Chat(ctx context.Context, parts ...ai.Part) (ai.ChatResponse, 
 	if err := ai.wait(ctx); err != nil {
 		return nil, err
 	}
-	resp, err := ai.model.GenerateContent(ctx, toParts(parts)...)
+	resp, err := ai.Models.GenerateContent(
+		ctx,
+		ai.model,
+		[]*genai.Content{genai.NewContentFromParts(toParts(parts), genai.RoleUser)},
+		ai.config,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -338,25 +332,23 @@ func (ai *Gemini) Chat(ctx context.Context, parts ...ai.Part) (ai.ChatResponse, 
 var _ ai.ChatStream = new(ChatStream)
 
 type ChatStream struct {
-	iter *genai.GenerateContentResponseIterator
+	next func() (*genai.GenerateContentResponse, error, bool)
+	stop func()
 }
 
 func (stream *ChatStream) Next() (ai.ChatResponse, error) {
-	if stream.iter == nil {
-		return nil, errors.New("stream iterator is nil or already closed")
+	resp, err, ok := stream.next()
+	if !ok {
+		return nil, io.EOF
 	}
-	resp, err := stream.iter.Next()
 	if err != nil {
-		if err == iterator.Done {
-			return nil, io.EOF
-		}
 		return nil, err
 	}
 	return &ChatResponse{resp}, nil
 }
 
 func (stream *ChatStream) Close() error {
-	stream.iter = nil
+	stream.stop()
 	return nil
 }
 
@@ -364,21 +356,31 @@ func (ai *Gemini) ChatStream(ctx context.Context, parts ...ai.Part) (ai.ChatStre
 	if err := ai.wait(ctx); err != nil {
 		return nil, err
 	}
-	return &ChatStream{ai.model.GenerateContentStream(ctx, toParts(parts)...)}, nil
+	next, stop := iter.Pull2(ai.Models.GenerateContentStream(
+		ctx,
+		ai.model,
+		[]*genai.Content{genai.NewContentFromParts(toParts(parts), genai.RoleUser)},
+		ai.config,
+	))
+	return &ChatStream{next, stop}, nil
 }
 
 var _ ai.ChatSession = new(ChatSession)
 
 type ChatSession struct {
 	ai *Gemini
-	cs *genai.ChatSession
+	cs *genai.Chat
 }
 
 func (session *ChatSession) Chat(ctx context.Context, parts ...ai.Part) (ai.ChatResponse, error) {
 	if err := session.ai.wait(ctx); err != nil {
 		return nil, err
 	}
-	resp, err := session.cs.SendMessage(ctx, toParts(parts)...)
+	var genaiParts []genai.Part
+	for _, i := range toParts(parts) {
+		genaiParts = append(genaiParts, *i)
+	}
+	resp, err := session.cs.SendMessage(ctx, genaiParts...)
 	if err != nil {
 		return nil, err
 	}
@@ -389,16 +391,27 @@ func (session *ChatSession) ChatStream(ctx context.Context, parts ...ai.Part) (a
 	if err := session.ai.wait(ctx); err != nil {
 		return nil, err
 	}
-	return &ChatStream{session.cs.SendMessageStream(ctx, toParts(parts)...)}, nil
+	var genaiParts []genai.Part
+	for _, i := range toParts(parts) {
+		genaiParts = append(genaiParts, *i)
+	}
+	next, stop := iter.Pull2(session.cs.SendMessageStream(ctx, genaiParts...))
+	return &ChatStream{next, stop}, nil
 }
 
 func (session *ChatSession) History() (history []ai.Content) {
-	for _, i := range session.cs.History {
+	for _, i := range session.cs.History(false) {
 		history = append(history, ai.Content{Parts: fromParts(i.Parts), Role: i.Role})
 	}
 	return
 }
 
 func (ai *Gemini) ChatSession() ai.ChatSession {
-	return &ChatSession{ai, ai.model.StartChat()}
+	chat, _ := ai.Chats.Create(context.Background(), ai.model, ai.config, nil)
+	return &ChatSession{ai, chat}
+}
+
+func (ai *Gemini) Close() error {
+	ai.Client = nil
+	return nil
 }

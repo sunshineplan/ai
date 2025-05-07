@@ -80,8 +80,8 @@ func (Anthropic) LLMs() ai.LLMs {
 	return ai.Anthropic
 }
 
-func (anthropic *Anthropic) Model(_ context.Context) (string, error) {
-	return anthropic.model, nil
+func (anthropic *Anthropic) Model() string {
+	return anthropic.model
 }
 
 func (anthropic *Anthropic) SetLimit(rpm int64) {
