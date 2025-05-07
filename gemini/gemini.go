@@ -34,10 +34,8 @@ func New(ctx context.Context, opts ...ai.ClientOption) (ai.AI, error) {
 	for _, i := range opts {
 		i.Apply(cfg)
 	}
-	cc := new(genai.ClientConfig)
-	if cfg.Proxy == "" {
-		cc.APIKey = cfg.APIKey
-	} else {
+	cc := &genai.ClientConfig{APIKey: cfg.APIKey}
+	if cfg.Proxy != "" {
 		u, err := url.Parse(cfg.Proxy)
 		if err != nil {
 			return nil, err
