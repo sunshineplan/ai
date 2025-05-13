@@ -372,11 +372,7 @@ func (session *ChatSession) Chat(ctx context.Context, parts ...ai.Part) (ai.Chat
 	if err := session.ai.wait(ctx); err != nil {
 		return nil, err
 	}
-	var genaiParts []genai.Part
-	for _, i := range toParts(parts) {
-		genaiParts = append(genaiParts, *i)
-	}
-	resp, err := session.cs.SendMessage(ctx, genaiParts...)
+	resp, err := session.cs.Send(ctx, toParts(parts)...)
 	if err != nil {
 		return nil, err
 	}
@@ -387,11 +383,7 @@ func (session *ChatSession) ChatStream(ctx context.Context, parts ...ai.Part) (a
 	if err := session.ai.wait(ctx); err != nil {
 		return nil, err
 	}
-	var genaiParts []genai.Part
-	for _, i := range toParts(parts) {
-		genaiParts = append(genaiParts, *i)
-	}
-	next, stop := iter.Pull2(session.cs.SendMessageStream(ctx, genaiParts...))
+	next, stop := iter.Pull2(session.cs.SendStream(ctx, toParts(parts)...))
 	return &ChatStream{next, stop}, nil
 }
 
