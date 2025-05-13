@@ -224,17 +224,17 @@ func fromParts(src []*genai.Part) (dst []ai.Part) {
 			if err != nil {
 				panic(err)
 			}
-			dst = append(dst, ai.FunctionCall{ID: i.FunctionCall.ID, Name: i.FunctionCall.Name, Arguments: string(b)})
+			id := i.FunctionCall.ID
+			if id == "" {
+				id = i.FunctionCall.Name
+			}
+			dst = append(dst, ai.FunctionCall{ID: id, Name: i.FunctionCall.Name, Arguments: string(b)})
 		} else if i.FunctionResponse != nil {
 			b, err := json.Marshal(i.FunctionResponse.Response)
 			if err != nil {
 				panic(err)
 			}
-			id := i.FunctionResponse.ID
-			if id == "" {
-				id = i.FunctionResponse.Name
-			}
-			dst = append(dst, ai.FunctionResponse{ID: id, Response: string(b)})
+			dst = append(dst, ai.FunctionResponse{ID: i.FunctionResponse.ID, Response: string(b)})
 		}
 	}
 	return
@@ -274,7 +274,11 @@ func (resp *ChatResponse) FunctionCalls() (res []ai.FunctionCall) {
 					if err != nil {
 						panic(err)
 					}
-					res = append(res, ai.FunctionCall{ID: i.FunctionCall.ID, Name: i.FunctionCall.Name, Arguments: string(b)})
+					id := i.FunctionCall.ID
+					if id == "" {
+						id = i.FunctionCall.Name
+					}
+					res = append(res, ai.FunctionCall{ID: id, Name: i.FunctionCall.Name, Arguments: string(b)})
 				}
 			}
 		}

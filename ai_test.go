@@ -261,12 +261,8 @@ func testFunctionCall(t *testing.T, model string, c ai.AI) {
 		if c := "Mountain View"; !strings.Contains(locArg, c) {
 			t.Fatalf(`FunctionCall.Args["location"]: got %q, want string containing %q`, locArg, c)
 		}
-		id := funcall.ID
-		if id == "" {
-			id = funcall.Name
-		}
 		stream, err = session.ChatStream(context.Background(), ai.Text("response:"), ai.FunctionResponse{
-			ID:       id,
+			ID:       funcall.ID,
 			Response: `{"theater":"AMC16"}`,
 		})
 		if err != nil {
