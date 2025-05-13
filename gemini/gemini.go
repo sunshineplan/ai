@@ -234,11 +234,7 @@ func fromParts(src []*genai.Part) (dst []ai.Part) {
 			if err != nil {
 				panic(err)
 			}
-			id := i.FunctionResponse.ID
-			if id == "" {
-				id = i.FunctionResponse.Name
-			}
-			dst = append(dst, ai.FunctionResponse{ID: id, Response: string(b)})
+			dst = append(dst, ai.FunctionResponse{ID: i.FunctionResponse.ID, Response: string(b)})
 		}
 	}
 	return
