@@ -273,12 +273,7 @@ func (c *ChatGPT) createRequest(
 		req.ResponseFormat = c.json
 	}
 	var msgs []openai.ChatCompletionMessageParamUnion
-	for _, i := range history {
-		if len(i.GetToolCalls()) > 0 {
-			continue
-		}
-		msgs = append(msgs, i)
-	}
+	msgs = append(msgs, history...)
 	for _, i := range messages {
 		switch v := i.(type) {
 		case ai.Text:
@@ -362,12 +357,11 @@ func (cs *ChatStream) Next() (ai.ChatResponse, error) {
 		for i := range maps.Values(cs.toolCalls) {
 			toolCalls = append(toolCalls, *i)
 		}
-		if cs.content != "" || len(toolCalls) > 0 {
+		if cs.content != "" {
+			cs.session.history = append(cs.session.history, openai.AssistantMessage(cs.content))
+		} else if len(toolCalls) > 0 {
 			cs.session.history = append(cs.session.history, openai.ChatCompletionMessageParamUnion{
 				OfAssistant: &openai.ChatCompletionAssistantMessageParam{
-					Content: openai.ChatCompletionAssistantMessageParamContentUnion{
-						OfString: openai.String(cs.content),
-					},
 					ToolCalls: toolCalls,
 				},
 			})
@@ -419,7 +413,7 @@ func (session *ChatSession) addUserHistory(messages ...ai.Part) {
 		case ai.Blob:
 			session.history = append(session.history, openai.UserMessage(toImagePart(ai.ImageData(v.MIMEType, v.Data))))
 		case ai.FunctionResponse:
-			session.history = append(session.history, openai.ToolMessage(v.ID, v.Response))
+			session.history = append(session.history, openai.ToolMessage(v.Response, v.ID))
 		}
 	}
 }
