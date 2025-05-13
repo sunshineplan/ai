@@ -224,11 +224,7 @@ func fromParts(src []*genai.Part) (dst []ai.Part) {
 			if err != nil {
 				panic(err)
 			}
-			id := i.FunctionCall.ID
-			if id == "" {
-				id = i.FunctionCall.Name
-			}
-			dst = append(dst, ai.FunctionCall{ID: id, Name: i.FunctionCall.Name, Arguments: string(b)})
+			dst = append(dst, ai.FunctionCall{ID: i.FunctionCall.ID, Name: i.FunctionCall.Name, Arguments: string(b)})
 		} else if i.FunctionResponse != nil {
 			b, err := json.Marshal(i.FunctionResponse.Response)
 			if err != nil {
@@ -278,11 +274,7 @@ func (resp *ChatResponse) FunctionCalls() (res []ai.FunctionCall) {
 					if err != nil {
 						panic(err)
 					}
-					id := i.FunctionCall.ID
-					if id == "" {
-						id = i.FunctionCall.Name
-					}
-					res = append(res, ai.FunctionCall{ID: id, Name: i.FunctionCall.Name, Arguments: string(b)})
+					res = append(res, ai.FunctionCall{ID: i.FunctionCall.ID, Name: i.FunctionCall.Name, Arguments: string(b)})
 				}
 			}
 		}
