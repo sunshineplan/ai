@@ -121,11 +121,11 @@ func (a *Anthropic) SetFunctionCall(f []ai.Function, mode ai.FunctionCallingMode
 	}
 	switch mode {
 	case ai.FunctionCallingAuto:
-		a.toolChoice = anthropic.ToolChoiceUnionParam{OfToolChoiceAuto: &anthropic.ToolChoiceAutoParam{}}
+		a.toolChoice = anthropic.ToolChoiceUnionParam{OfAuto: &anthropic.ToolChoiceAutoParam{}}
 	case ai.FunctionCallingAny:
-		a.toolChoice = anthropic.ToolChoiceUnionParam{OfToolChoiceAny: &anthropic.ToolChoiceAnyParam{}}
+		a.toolChoice = anthropic.ToolChoiceUnionParam{OfAny: &anthropic.ToolChoiceAnyParam{}}
 	case ai.FunctionCallingNone:
-		a.toolChoice = anthropic.ToolChoiceUnionParam{OfToolChoiceNone: &anthropic.ToolChoiceNoneParam{}}
+		a.toolChoice = anthropic.ToolChoiceUnionParam{OfNone: &anthropic.ToolChoiceNoneParam{}}
 	default:
 		a.toolChoice = anthropic.ToolChoiceUnionParam{}
 	}
@@ -233,13 +233,13 @@ func toImageBlock(img ai.Image) anthropic.ContentBlockParamUnion {
 }
 
 func fromImageBlockSource(img anthropic.ImageBlockParamSourceUnion) ai.Image {
-	if src := img.OfBase64ImageSource; src != nil {
+	if src := img.OfBase64; src != nil {
 		b, err := base64.StdEncoding.DecodeString(src.Data)
 		if err != nil {
 			panic(err)
 		}
 		return ai.ImageData(string(src.MediaType), b)
-	} else if src := img.OfURLImageSource; src != nil {
+	} else if src := img.OfURL; src != nil {
 		return ai.Image(src.URL)
 	}
 	panic(fmt.Sprintf("bad image: %v", img))
@@ -271,7 +271,7 @@ func (c *Anthropic) createRequest(
 	for _, i := range history {
 		var content []anthropic.ContentBlockParamUnion
 		for _, v := range i.Content {
-			if v.OfRequestToolUseBlock != nil {
+			if v.OfToolUse != nil {
 				continue
 			}
 			content = append(content, v)
@@ -419,33 +419,33 @@ func (session *ChatSession) ChatStream(ctx context.Context, messages ...ai.Part)
 func (session *ChatSession) History() (history []ai.Content) {
 	for _, i := range session.history {
 		for _, v := range i.Content {
-			if v.OfRequestTextBlock != nil {
-				if text := v.OfRequestTextBlock.Text; text != "" {
+			if v.OfText != nil {
+				if text := v.OfText.Text; text != "" {
 					history = append(history, ai.Content{Role: string(i.Role), Parts: []ai.Part{ai.Text(text)}})
 				}
 			}
-			if v.OfRequestImageBlock != nil {
+			if v.OfImage != nil {
 				history = append(history, ai.Content{Role: string(i.Role), Parts: []ai.Part{
-					fromImageBlockSource(v.OfRequestImageBlock.Source),
+					fromImageBlockSource(v.OfImage.Source),
 				}})
 			}
-			if v.OfRequestToolUseBlock != nil {
-				args, err := json.Marshal(v.OfRequestToolUseBlock.Input)
+			if v.OfToolUse != nil {
+				args, err := json.Marshal(v.OfToolUse.Input)
 				if err != nil {
 					panic(err)
 				}
 				history = append(history, ai.Content{Role: string(i.Role), Parts: []ai.Part{ai.FunctionCall{
-					ID:        v.OfRequestToolUseBlock.ID,
-					Name:      v.OfRequestToolUseBlock.Name,
+					ID:        v.OfToolUse.ID,
+					Name:      v.OfToolUse.Name,
 					Arguments: string(args),
 				}}})
 			}
-			if v.OfRequestToolResultBlock != nil {
-				for _, ii := range v.OfRequestToolResultBlock.Content {
-					if ii.OfRequestTextBlock != nil {
+			if v.OfToolResult != nil {
+				for _, ii := range v.OfToolResult.Content {
+					if ii.OfText != nil {
 						history = append(history, ai.Content{Role: string(i.Role), Parts: []ai.Part{ai.FunctionResponse{
-							ID:       v.OfRequestToolResultBlock.ToolUseID,
-							Response: ii.OfRequestTextBlock.Text,
+							ID:       v.OfToolResult.ToolUseID,
+							Response: ii.OfText.Text,
 						}}})
 					}
 				}
