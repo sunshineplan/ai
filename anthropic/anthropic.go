@@ -21,7 +21,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-const defaultModel = anthropic.ModelClaude3_5SonnetLatest
+const defaultModel = anthropic.ModelClaudeSonnet4_0
 
 var DefaultMaxTokens int64 = 1024
 
@@ -29,7 +29,7 @@ var _ ai.AI = new(Anthropic)
 
 type Anthropic struct {
 	*anthropic.Client
-	model       string
+	model       anthropic.Model
 	toolChoice  anthropic.ToolChoiceUnionParam
 	tools       []anthropic.ToolUnionParam
 	maxTokens   *int64
@@ -71,9 +71,9 @@ func New(opts ...ai.ClientOption) (ai.AI, error) {
 
 func NewWithClient(client anthropic.Client, model string) ai.AI {
 	if model == "" {
-		model = defaultModel
+		return &Anthropic{Client: &client, model: defaultModel}
 	}
-	return &Anthropic{Client: &client, model: model}
+	return &Anthropic{Client: &client, model: anthropic.Model(model)}
 }
 
 func (Anthropic) LLMs() ai.LLMs {
@@ -81,7 +81,7 @@ func (Anthropic) LLMs() ai.LLMs {
 }
 
 func (anthropic *Anthropic) Model() string {
-	return anthropic.model
+	return string(anthropic.model)
 }
 
 func (anthropic *Anthropic) SetLimit(rpm int64) {
@@ -102,7 +102,7 @@ func (ai *Anthropic) wait(ctx context.Context) error {
 	return nil
 }
 
-func (ai *Anthropic) SetModel(model string) { ai.model = model }
+func (ai *Anthropic) SetModel(model string) { ai.model = anthropic.Model(model) }
 func (a *Anthropic) SetFunctionCall(f []ai.Function, mode ai.FunctionCallingMode) {
 	if a.tools = nil; len(f) == 0 {
 		a.toolChoice = anthropic.ToolChoiceUnionParam{}
