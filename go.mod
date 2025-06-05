@@ -6,7 +6,7 @@ require (
 	github.com/anthropics/anthropic-sdk-go v1.4.0
 	github.com/openai/openai-go v1.3.0
 	github.com/sunshineplan/workers v1.0.5
-	golang.org/x/time v0.11.0
+	golang.org/x/time v0.12.0
 	google.golang.org/genai v1.8.0
 )
 
