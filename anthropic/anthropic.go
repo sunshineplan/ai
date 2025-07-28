@@ -141,6 +141,19 @@ func (ai *Anthropic) SetJSONResponse(_ bool, _ *ai.JSONSchema) {
 	fmt.Println("Anthropic currently doesn't support SetJSONResponse")
 }
 
+func (ai *Anthropic) ListModels(ctx context.Context) ([]string, error) {
+	iter := ai.Client.Models.ListAutoPaging(ctx, anthropic.ModelListParams{Limit: param.NewOpt[int64](1000)})
+	var res []string
+	for iter.Next() {
+		model := iter.Current()
+		res = append(res, model.ID)
+	}
+	if err := iter.Err(); err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
 var _ ai.ChatResponse = new(ChatResponse[*anthropic.Message])
 
 type ChatCompletionResponse interface {

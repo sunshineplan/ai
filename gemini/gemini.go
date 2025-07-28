@@ -182,6 +182,17 @@ func (ai *Gemini) SetJSONResponse(set bool, schema *ai.JSONSchema) {
 	}
 }
 
+func (ai *Gemini) ListModels(ctx context.Context) ([]string, error) {
+	var models []string
+	for i, err := range ai.Models.All(ctx) {
+		if err != nil {
+			return nil, err
+		}
+		models = append(models, i.Name)
+	}
+	return models, nil
+}
+
 func toParts(src []ai.Part) (dst []*genai.Part) {
 	for _, i := range src {
 		switch v := i.(type) {

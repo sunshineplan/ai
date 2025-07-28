@@ -13,6 +13,8 @@ type AI interface {
 	LLMs() LLMs
 	Model() string
 
+	ListModels(context.Context) ([]string, error)
+
 	Limiter
 
 	SetModel(string)
