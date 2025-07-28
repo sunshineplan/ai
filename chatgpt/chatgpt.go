@@ -157,6 +157,19 @@ func (ai *ChatGPT) SetJSONResponse(set bool, schema *ai.JSONSchema) {
 	ai.json = responseFormat
 }
 
+func (ai *ChatGPT) ListModels(ctx context.Context) ([]string, error) {
+	iter := ai.Client.Models.ListAutoPaging(ctx)
+	var res []string
+	for iter.Next() {
+		model := iter.Current()
+		res = append(res, model.ID)
+	}
+	if err := iter.Err(); err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
 var _ ai.ChatResponse = new(ChatResponse[*openai.ChatCompletion])
 
 type ChatCompletionResponse interface {
