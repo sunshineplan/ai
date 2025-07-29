@@ -181,6 +181,13 @@ func (ai *Gemini) SetJSONResponse(set bool, schema *ai.JSONSchema) {
 		ai.config.ResponseSchema = nil
 	}
 }
+func (ai *Gemini) SetThinking(set bool) {
+	if set {
+		ai.config.ThinkingConfig = &genai.ThinkingConfig{IncludeThoughts: true}
+	} else {
+		ai.config.ThinkingConfig = nil
+	}
+}
 
 func (ai *Gemini) ListModels(ctx context.Context) ([]string, error) {
 	var models []string
@@ -266,7 +273,22 @@ func (resp *ChatResponse) Results() (res []string) {
 		if i.Content != nil {
 			var s []string
 			for _, i := range i.Content.Parts {
-				if i.Text != "" {
+				if i.Text != "" && !i.Thought {
+					s = append(s, i.Text)
+				}
+			}
+			res = append(res, strings.Join(s, "\n"))
+		}
+	}
+	return
+}
+
+func (resp *ChatResponse) Thoughts() (res []string) {
+	for _, i := range resp.Candidates {
+		if i.Content != nil {
+			var s []string
+			for _, i := range i.Content.Parts {
+				if i.Text != "" && i.Thought {
 					s = append(s, i.Text)
 				}
 			}

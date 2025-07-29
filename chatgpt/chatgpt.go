@@ -3,8 +3,8 @@ package chatgpt
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
-	"maps"
 	"math"
 	"net/http"
 	"net/url"
@@ -17,6 +17,7 @@ import (
 	"github.com/openai/openai-go/option"
 	"github.com/openai/openai-go/packages/param"
 	"github.com/openai/openai-go/packages/ssestream"
+	"github.com/openai/openai-go/shared"
 	"golang.org/x/time/rate"
 )
 
@@ -34,6 +35,7 @@ type ChatGPT struct {
 	topP        *float64
 	count       *int64
 	json        openai.ChatCompletionNewParamsResponseFormatUnion
+	thinking    bool
 
 	limiter *rate.Limiter
 }
@@ -156,6 +158,7 @@ func (ai *ChatGPT) SetJSONResponse(set bool, schema *ai.JSONSchema) {
 	}
 	ai.json = responseFormat
 }
+func (ai *ChatGPT) SetThinking(set bool) { ai.thinking = set }
 
 func (ai *ChatGPT) ListModels(ctx context.Context) ([]string, error) {
 	iter := ai.Client.Models.ListAutoPaging(ctx)
@@ -199,6 +202,11 @@ func (resp *ChatResponse[Response]) Results() (res []string) {
 			}
 		}
 	}
+	return
+}
+
+func (resp *ChatResponse[Response]) Thoughts() (res []string) {
+	fmt.Println("ChatGPT doesn't support reasoning content")
 	return
 }
 
@@ -285,6 +293,9 @@ func (c *ChatGPT) createRequest(
 	if c.json.OfJSONObject != nil || c.json.OfJSONSchema != nil {
 		req.ResponseFormat = c.json
 	}
+	if c.thinking {
+		req.ReasoningEffort = shared.ReasoningEffortMedium
+	}
 	var msgs []openai.ChatCompletionMessageParamUnion
 	msgs = append(msgs, history...)
 	for _, i := range messages {
@@ -330,54 +341,26 @@ func (ai *ChatGPT) Chat(ctx context.Context, messages ...ai.Part) (ai.ChatRespon
 var _ ai.ChatStream = new(ChatStream)
 
 type ChatStream struct {
-	stream    *ssestream.Stream[openai.ChatCompletionChunk]
-	session   *ChatSession
-	content   string
-	toolCalls map[string]*openai.ChatCompletionMessageToolCallParam
+	stream  *ssestream.Stream[openai.ChatCompletionChunk]
+	session *ChatSession
+	message openai.ChatCompletionAccumulator
 }
 
 func (cs *ChatStream) Next() (ai.ChatResponse, error) {
 	if cs.stream.Next() {
 		resp := cs.stream.Current()
-		if cs.session != nil && len(resp.Choices) > 0 {
-			cs.content += resp.Choices[0].Delta.Content
-			for _, i := range resp.Choices[0].Delta.ToolCalls {
-				if cs.toolCalls == nil {
-					cs.toolCalls = make(map[string]*openai.ChatCompletionMessageToolCallParam)
-				}
-				if tc, ok := cs.toolCalls[i.ID]; ok {
-					tc.Function.Name += i.Function.Name
-					tc.Function.Arguments += i.Function.Arguments
-				} else {
-					cs.toolCalls[i.ID] = &openai.ChatCompletionMessageToolCallParam{
-						ID: i.ID,
-						Function: openai.ChatCompletionMessageToolCallFunctionParam{
-							Name:      i.Function.Name,
-							Arguments: i.Function.Arguments,
-						},
-					}
-				}
-			}
+		if cs.session != nil && !cs.message.AddChunk(resp) {
+			return nil, fmt.Errorf("accumulate: the chunk could not be successfully accumulated")
 		}
 		return &ChatResponse[openai.ChatCompletionChunk]{resp}, nil
 	}
 	if err := cs.stream.Err(); err != nil {
-		cs.content = ""
+		cs.message = openai.ChatCompletionAccumulator{}
 		return nil, err
 	}
 	if cs.session != nil {
-		var toolCalls []openai.ChatCompletionMessageToolCallParam
-		for i := range maps.Values(cs.toolCalls) {
-			toolCalls = append(toolCalls, *i)
-		}
-		if cs.content != "" {
-			cs.session.history = append(cs.session.history, openai.AssistantMessage(cs.content))
-		} else if len(toolCalls) > 0 {
-			cs.session.history = append(cs.session.history, openai.ChatCompletionMessageParamUnion{
-				OfAssistant: &openai.ChatCompletionAssistantMessageParam{
-					ToolCalls: toolCalls,
-				},
-			})
+		for _, i := range cs.message.ChatCompletion.Choices {
+			cs.session.history = append(cs.session.history, i.Message.ToParam())
 		}
 	}
 	return nil, io.EOF
@@ -406,7 +389,7 @@ func (ai *ChatGPT) ChatStream(ctx context.Context, messages ...ai.Part) (ai.Chat
 	if err != nil {
 		return nil, err
 	}
-	return &ChatStream{stream, nil, "", nil}, nil
+	return &ChatStream{stream: stream, session: nil}, nil
 }
 
 var _ ai.ChatSession = new(ChatSession)
@@ -449,7 +432,7 @@ func (session *ChatSession) ChatStream(ctx context.Context, messages ...ai.Part)
 		return nil, err
 	}
 	session.addUserHistory(messages...)
-	return &ChatStream{stream, session, "", nil}, nil
+	return &ChatStream{stream: stream, session: session}, nil
 }
 
 func (session *ChatSession) History() (history []ai.Content) {

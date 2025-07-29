@@ -77,6 +77,7 @@ type Model interface {
 	SetTemperature(x float64)
 	SetTopP(x float64)
 	SetJSONResponse(set bool, schema *JSONSchema)
+	SetThinking(set bool)
 }
 
 type Chatbot interface {
@@ -103,6 +104,7 @@ type TokenCount struct {
 type ChatResponse interface {
 	Raw() any
 	Results() []string
+	Thoughts() []string
 	FunctionCalls() []FunctionCall
 	TokenCount() TokenCount
 }
