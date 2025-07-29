@@ -23,7 +23,7 @@ import (
 
 const defaultModel = anthropic.ModelClaudeSonnet4_0
 
-var DefaultMaxTokens int64 = 1024
+var DefaultMaxTokens int64 = 64000
 
 var _ ai.AI = new(Anthropic)
 
@@ -35,6 +35,7 @@ type Anthropic struct {
 	maxTokens   *int64
 	temperature *float64
 	topP        *float64
+	thinking    bool
 
 	limiter *rate.Limiter
 }
@@ -133,6 +134,7 @@ func (a *Anthropic) SetFunctionCall(f []ai.Function, mode ai.FunctionCallingMode
 func (ai *Anthropic) SetMaxTokens(i int64)     { ai.maxTokens = &i }
 func (ai *Anthropic) SetTemperature(f float64) { ai.temperature = &f }
 func (ai *Anthropic) SetTopP(f float64)        { ai.topP = &f }
+func (ai *Anthropic) SetThinking(set bool)     { ai.thinking = set }
 
 func (ai *Anthropic) SetCount(i int64) {
 	fmt.Println("Anthropic doesn't support SetCount")
@@ -182,6 +184,27 @@ func (resp *ChatResponse[Response]) Results() (res []string) {
 			if v, ok := v.Delta.AsAny().(anthropic.TextDelta); ok {
 				if v.Text != "" {
 					res = append(res, v.Text)
+				}
+			}
+		}
+	}
+	return
+}
+
+func (resp *ChatResponse[Response]) Thoughts() (res []string) {
+	switch v := any(resp.resp).(type) {
+	case *anthropic.Message:
+		for _, i := range v.Content {
+			if v, ok := i.AsAny().(anthropic.ThinkingBlock); ok {
+				res = append(res, v.Thinking)
+			}
+		}
+	case anthropic.MessageStreamEventUnion:
+		switch v := v.AsAny().(type) {
+		case anthropic.ContentBlockDeltaEvent:
+			if v, ok := v.Delta.AsAny().(anthropic.ThinkingDelta); ok {
+				if v.Thinking != "" {
+					res = append(res, v.Thinking)
 				}
 			}
 		}
@@ -280,6 +303,9 @@ func (c *Anthropic) createRequest(
 	if c.topP != nil {
 		req.TopP = anthropic.Float(*c.topP)
 	}
+	if c.thinking {
+		req.Thinking = anthropic.ThinkingConfigParamOfEnabled(10000)
+	}
 	var msgs []anthropic.MessageParam
 	for _, i := range history {
 		var content []anthropic.ContentBlockParamUnion
@@ -345,8 +371,7 @@ func (cs *ChatStream) Next() (ai.ChatResponse, error) {
 	if cs.stream.Next() {
 		resp := cs.stream.Current()
 		if cs.session != nil {
-			err := cs.message.Accumulate(resp)
-			if err != nil {
+			if err := cs.message.Accumulate(resp); err != nil {
 				return nil, err
 			}
 		}
