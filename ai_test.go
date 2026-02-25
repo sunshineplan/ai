@@ -17,6 +17,10 @@ import (
 	"github.com/sunshineplan/ai/gemini"
 )
 
+func sleep() {
+	time.Sleep(30 * time.Second)
+}
+
 func testChat(model string, c ai.AI, prompt string) error {
 	if model == "" {
 		return nil
@@ -33,6 +37,7 @@ func testChat(model string, c ai.AI, prompt string) error {
 	fmt.Println(resp)
 	fmt.Println(resp.TokenCount())
 	fmt.Println("---")
+	sleep()
 	return nil
 }
 
@@ -62,6 +67,7 @@ func testChatStream(model string, c ai.AI, prompt string) error {
 		fmt.Println(resp.TokenCount())
 	}
 	fmt.Println("---")
+	sleep()
 	return nil
 }
 
@@ -112,6 +118,7 @@ func testChatSession(model string, c ai.AI) error {
 		}
 	}
 	fmt.Println("---")
+	sleep()
 	return nil
 }
 
@@ -129,6 +136,7 @@ func testImage(t *testing.T, model string, c ai.AI) {
 		}
 		fmt.Println(resp)
 		checkMatch(t, resp.Results()[0], "man|person", "computer|laptop")
+		sleep()
 	}
 }
 
@@ -155,6 +163,7 @@ func testJSON(t *testing.T, model string, c ai.AI) {
 			t.Fatal(err)
 		}
 	}
+	sleep()
 	c.SetJSONResponse(true, &ai.JSONSchema{
 		Name: "color list",
 		Schema: ai.Schema{
@@ -311,9 +320,11 @@ func testFunctionCall(t *testing.T, model string, c ai.AI) {
 	t.Run("direct", func(t *testing.T) {
 		movieChat(t, schema, ai.FunctionCallingAuto)
 	})
+	sleep()
 	t.Run("none", func(t *testing.T) {
 		movieChat(t, schema, ai.FunctionCallingNone)
 	})
+	sleep()
 }
 
 func checkMatch(t *testing.T, got string, wants ...string) {
