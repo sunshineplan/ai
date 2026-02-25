@@ -17,7 +17,7 @@ import (
 	"google.golang.org/genai"
 )
 
-const defaultModel = "gemini-2.0-flash"
+const defaultModel = "gemini-flash-latest"
 
 var _ ai.AI = new(Gemini)
 
