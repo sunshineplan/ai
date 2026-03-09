@@ -1,12 +1,12 @@
 module github.com/sunshineplan/ai
 
-go 1.25
+go 1.25.0
 
 require (
 	github.com/anthropics/anthropic-sdk-go v1.26.0
 	github.com/openai/openai-go v1.12.0
 	github.com/sunshineplan/workers v1.0.6
-	golang.org/x/time v0.14.0
+	golang.org/x/time v0.15.0
 	google.golang.org/genai v1.49.0
 )
 
