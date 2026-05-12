@@ -3,7 +3,7 @@ module github.com/sunshineplan/ai
 go 1.25.0
 
 require (
-	github.com/anthropics/anthropic-sdk-go v1.41.0
+	github.com/anthropics/anthropic-sdk-go v1.42.0
 	github.com/openai/openai-go v1.12.0
 	github.com/sunshineplan/workers v1.0.6
 	golang.org/x/time v0.15.0
@@ -27,7 +27,7 @@ require (
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/invopop/jsonschema v0.13.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
-	github.com/standard-webhooks/standard-webhooks/libraries v0.0.0-20260427160145-3afa6683f8b2 // indirect
+	github.com/standard-webhooks/standard-webhooks/libraries v0.0.0-20260508151727-1282bb917829 // indirect
 	github.com/sunshineplan/utils v0.1.79 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
