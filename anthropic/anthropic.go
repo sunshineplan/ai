@@ -21,7 +21,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-const defaultModel = anthropic.ModelClaudeSonnet4_0
+const defaultModel = anthropic.ModelClaudeSonnet4_6
 
 var DefaultMaxTokens int64 = 64000
 
